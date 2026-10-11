@@ -16,10 +16,16 @@ spring:
               - profile
         provider:
           google:
-            issuer-uri: http://localhost:9000/google
+            # Default = localhost (works when the backend runs on the HOST and the
+            # browser also uses localhost). When the backend runs INSIDE Docker,
+            # docker-compose sets MOCK_OAUTH_ISSUER=http://host.docker.internal:9000/google
+            # which both the container and the host browser can reach.
+            issuer-uri: ${MOCK_OAUTH_ISSUER:http://localhost:9000/google}
   mail:
-    host: localhost
-    port: 1025
+    # Default = localhost (host runs -> MailHog on localhost:1025).
+    # docker-compose overrides SPRING_MAIL_HOST=mailhog / PORT=1025 for the container.
+    host: ${SPRING_MAIL_HOST:localhost}
+    port: ${SPRING_MAIL_PORT:1025}
     properties:
       mail.smtp.auth: false
       mail.smtp.starttls.enable: false

@@ -112,7 +112,8 @@ services:
     container_name: apt-backend
     restart: unless-stopped
     environment:
-      SPRING_PROFILES_ACTIVE: docker
+      # docker = DB/host wiring; mock-oauth = route Google login to local mock-oauth2 (dev)
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-docker,mock-oauth}
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
       SPRING_DATASOURCE_USERNAME: ${MYSQL_USER}
       SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD}
@@ -121,6 +122,8 @@ services:
       SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD}
       SPRING_MAIL_HOST: mailhog
       SPRING_MAIL_PORT: 1025
+      # Backend runs in Docker -> reach the mock OAuth issuer via host gateway
+      MOCK_OAUTH_ISSUER: http://host.docker.internal:9000/google
       JWT_SECRET: ${JWT_SECRET}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
