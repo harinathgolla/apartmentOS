@@ -1,0 +1,10 @@
+services:
+  postgres:
+    ports:
+      - "${POSTGRES_PORT}:5432"
+  redis:
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}", "--save", ""]
+
+  # Expose mailhog by default in dev
+  mailhog:
+    profiles: [dev]   # always on in dev

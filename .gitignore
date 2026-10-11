@@ -1,0 +1,75 @@
+# ── Java / Maven ───────────────────────────────────────
+backend/target/
+*.class
+*.jar
+*.war
+!.mvn/wrapper/maven-wrapper.jar
+hs_err_pid*
+replay_pid*
+
+# ── Node / Next.js ─────────────────────────────────────
+node_modules/
+frontend/.next/
+frontend/out/
+frontend/build/
+.next/
+dist/
+build/
+*.tsbuildinfo
+next-env.d.ts
+
+# ── Environment / secrets ──────────────────────────────
+.env
+.env.local
+.env.*.local
+*.env
+!*.env.example
+!containers/.env.example
+!backend/.env.example
+
+# ── IDE ────────────────────────────────────────────────
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+.settings/
+.project
+.classpath
+*.swp
+*.swo
+*~
+
+# ── OS cruft ───────────────────────────────────────────
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ── Logs ───────────────────────────────────────────────
+*.log
+logs/
+
+# ── Docker volumes (if bind-mounted) ───────────────────
+containers/data/
+containers/pgdata/
+
+# ── Local Postgres / dev scratch ───────────────────────
+*.sql.gz
+/tmp/
+/scratch/
+
+# ── Coverage / test output ─────────────────────────────
+coverage/
+*.lcov
+.nyc_output/
+
+# ── Python (for dev.py) ────────────────────────────────
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# ── IntelliJ run configs that reference your machine ───
+.idea/workspace.xml
+.idea/shelf/
+.idea/httpRequests/

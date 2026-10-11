@@ -1,0 +1,34 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://postgres:5432/${POSTGRES_DB:apartment_db}
+    username: ${POSTGRES_USER:postgres}
+    password: ${POSTGRES_PASSWORD:postgres}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  liquibase:
+    enabled: true
+    change-log: classpath:db/changelog/db.changelog-master.xml
+    contexts: dev
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID:not-configured}
+            client-secret: ${GOOGLE_CLIENT_SECRET:not-configured}
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+            scope:
+              - openid
+              - email
+              - profile
+app:
+  jwt:
+    secret: ${JWT_SECRET:please-change-me}
+    expiration-ms: 86400000
+  frontend:
+    url: ${APP_FRONTEND_URL:http://localhost:3000}
+  gmail:
+    from-name: "Apartment Manager"
+  mail:
+    provider: smtp

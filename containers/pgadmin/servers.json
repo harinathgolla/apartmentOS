@@ -1,0 +1,14 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "Apartment SaaS (Docker)",
+      "Group": "Local",
+      "Host": "postgres",
+      "Port": 5432,
+      "MaintenanceDB": "apartment_db",
+      "Username": "postgres",
+      "SSLMode": "prefer",
+      "PassFile": "/pgpass"
+    }
+  }
+}

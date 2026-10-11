@@ -1,0 +1,4 @@
+ALTER TABLE tenancies ADD COLUMN IF NOT EXISTS frequency VARCHAR(20) DEFAULT 'MONTHLY';
+ALTER TABLE tenancies ADD COLUMN IF NOT EXISTS due_day INT DEFAULT 5;
+ALTER TABLE rent_records ADD COLUMN IF NOT EXISTS payment_mode VARCHAR(20);
+CREATE INDEX IF NOT EXISTS idx_rent_paid ON rent_records(apartment_id, paid);

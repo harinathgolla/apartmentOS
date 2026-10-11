@@ -1,0 +1,85 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 240 10% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 3.9%;
+    --primary: 244 75% 57%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
+    --accent: 240 4.8% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
+    --ring: 244 75% 57%;
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 240 10% 5.9%;
+    --card-foreground: 0 0% 98%;
+    --primary: 244 75% 65%;
+    --primary-foreground: 240 5.9% 10%;
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 72%;
+    --accent: 240 3.7% 15.9%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 4% 20%;
+    --input: 240 4% 20%;
+    --ring: 244 75% 65%;
+  }
+
+  * { @apply border-border; }
+  body { @apply bg-background text-foreground antialiased; }
+}
+
+@layer components {
+  .gradient-text {
+    @apply bg-gradient-to-r from-indigo-500 via-violet-500 to-fuchsia-500 bg-clip-text text-transparent;
+  }
+  .kpi-card {
+    @apply relative overflow-hidden rounded-2xl border bg-card transition-all hover:shadow-lg hover:-translate-y-0.5;
+  }
+}
+
+@layer utilities {
+  /* Horizontal scroll for tables on mobile */
+  .table-scroll {
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+  .table-scroll::-webkit-scrollbar {
+    height: 6px;
+  }
+  .table-scroll::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--border));
+    border-radius: 3px;
+  }
+
+  /* Minimum tap target on mobile */
+  @media (max-width: 767px) {
+    button, a[role="button"] {
+      min-height: 40px;
+    }
+    /* But allow the small icon buttons in the topbar to stay compact */
+    header button[aria-label="Open menu"],
+    header button.h-9 {
+      min-height: unset;
+    }
+  }
+}

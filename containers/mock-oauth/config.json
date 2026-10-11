@@ -1,0 +1,23 @@
+{
+  "interactiveLogin": true,
+  "httpServer": "NettyWrapper",
+  "tokenCallbacks": [
+    {
+      "issuerId": "google",
+      "tokenExpiry": 3600,
+      "requestMappings": [
+        {
+          "requestParam": "scope",
+          "match": "*",
+          "claims": {
+            "sub": "mock-google-user-1",
+            "email": "owner@saienclave.test",
+            "email_verified": true,
+            "name": "Mock Owner",
+            "picture": "https://i.pravatar.cc/150?img=12"
+          }
+        }
+      ]
+    }
+  ]
+}

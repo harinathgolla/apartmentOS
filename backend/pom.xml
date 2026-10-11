@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-parent</artifactId>
+    <version>4.0.8</version>
+    <relativePath/>
+  </parent>
+  <groupId>com.apartment</groupId>
+  <artifactId>apartment-saas</artifactId>
+  <version>1.0.0</version>
+  <properties>
+    <java.version>21</java.version>
+    <maven.compiler.release>21</maven.compiler.release>
+  </properties>
+  <dependencies>
+    <!-- Web / JPA / Security / Validation / Mail / Actuator -->
+    <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-web</artifactId></dependency>
+    <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-data-jpa</artifactId></dependency>
+    <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-security</artifactId></dependency>
+    <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-oauth2-client</artifactId></dependency>
+    <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-validation</artifactId></dependency>
+    <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-mail</artifactId></dependency>
+    <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-actuator</artifactId></dependency>
+    <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-cache</artifactId></dependency>
+    <dependency><groupId>com.github.ben-manes.caffeine</groupId><artifactId>caffeine</artifactId></dependency>
+
+    <!-- Flyway (Spring Boot 4 requires the starter) -->
+    <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-flyway</artifactId></dependency>
+    <dependency><groupId>org.flywaydb</groupId><artifactId>flyway-database-postgresql</artifactId></dependency>
+
+    <!-- Gmail API (send as user) -->
+    <dependency><groupId>com.google.api-client</groupId><artifactId>google-api-client</artifactId><version>2.6.0</version></dependency>
+    <dependency><groupId>com.google.apis</groupId><artifactId>google-api-services-gmail</artifactId><version>v1-rev20261005-2.0.0</version></dependency>
+    <dependency><groupId>com.google.http-client</groupId><artifactId>google-http-client-gson</artifactId><version>1.44.1</version></dependency>
+
+    <!-- Apache POI (Excel import) -->
+    <dependency><groupId>org.apache.poi</groupId><artifactId>poi-ooxml</artifactId><version>5.3.0</version></dependency>
+
+    <!-- Razorpay (subscription billing) -->
+    <dependency><groupId>com.razorpay</groupId><artifactId>razorpay-java</artifactId><version>1.4.7</version></dependency>
+
+    <!-- PDF (invoice generation) -->
+    <dependency><groupId>com.github.librepdf</groupId><artifactId>openpdf</artifactId><version>2.0.3</version></dependency>
+
+    <!-- JWT -->
+    <dependency><groupId>io.jsonwebtoken</groupId><artifactId>jjwt-api</artifactId><version>0.12.6</version></dependency>
+    <dependency><groupId>io.jsonwebtoken</groupId><artifactId>jjwt-impl</artifactId><version>0.12.6</version><scope>runtime</scope></dependency>
+    <dependency><groupId>io.jsonwebtoken</groupId><artifactId>jjwt-jackson</artifactId><version>0.12.6</version><scope>runtime</scope></dependency>
+
+    <!-- DB / Lombok -->
+    <dependency><groupId>org.postgresql</groupId><artifactId>postgresql</artifactId><scope>runtime</scope></dependency>
+    <dependency><groupId>org.projectlombok</groupId><artifactId>lombok</artifactId><optional>true</optional></dependency>
+
+    <!-- Test -->
+    <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-test</artifactId><scope>test</scope></dependency>
+    <dependency><groupId>org.springframework.security</groupId><artifactId>spring-security-test</artifactId><scope>test</scope></dependency>
+    <dependency><groupId>org.testcontainers</groupId><artifactId>postgresql</artifactId><version>1.21.4</version><scope>test</scope></dependency>
+  </dependencies>
+  <build><plugins>
+    <plugin><groupId>org.springframework.boot</groupId><artifactId>spring-boot-maven-plugin</artifactId></plugin>
+  </plugins></build>
+</project>
