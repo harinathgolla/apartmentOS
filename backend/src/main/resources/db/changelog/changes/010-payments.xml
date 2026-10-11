@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.29.xsd">
+
+    <changeSet id="010-create-payments" author="apartment-saas">
+        <createTable tableName="payments">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="invoice_id" type="BIGINT"/>
+            <column name="apartment_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="amount" type="DECIMAL(12,2)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="mode" type="VARCHAR(20)"/>
+            <column name="reference" type="VARCHAR(120)"/>
+            <column name="paid_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"/>
+            <column name="recorded_by" type="BIGINT"/>
+        </createTable>
+        <addForeignKeyConstraint baseTableName="payments" baseColumnNames="invoice_id"
+                                 referencedTableName="invoices" referencedColumnNames="id"
+                                 constraintName="fk_payments_invoice"/>
+        <addForeignKeyConstraint baseTableName="payments" baseColumnNames="recorded_by"
+                                 referencedTableName="users" referencedColumnNames="id"
+                                 constraintName="fk_payments_user"/>
+    </changeSet>
+
+</databaseChangeLog>

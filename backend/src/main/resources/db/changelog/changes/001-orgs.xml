@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.29.xsd">
+
+    <changeSet id="001-create-orgs" author="apartment-saas">
+        <createTable tableName="orgs">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="name" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="slug" type="VARCHAR(120)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+            <column name="plan" type="VARCHAR(20)" defaultValue="TRIAL">
+                <constraints nullable="false"/>
+            </column>
+            <column name="trial_ends_at" type="TIMESTAMP"/>
+            <column name="plan_renews_at" type="TIMESTAMP"/>
+            <column name="razorpay_customer_id" type="VARCHAR(120)"/>
+            <column name="razorpay_subscription_id" type="VARCHAR(120)"/>
+            <column name="billing_email" type="VARCHAR(255)"/>
+            <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"/>
+        </createTable>
+    </changeSet>
+
+</databaseChangeLog>

@@ -6,9 +6,10 @@ spring:
     virtual:
       enabled: true
   datasource:
-    url: jdbc:postgresql://localhost:5432/apartment_db
-    username: postgres
-    password: postgres
+    url: jdbc:mysql://localhost:3306/apartment_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: apartment
+    password: apartment
     hikari:
       maximum-pool-size: 20
   jpa:
@@ -20,9 +21,10 @@ spring:
       hibernate.jdbc.batch_size: 30
       hibernate.order_inserts: true
       hibernate.order_updates: true
-  flyway:
+  # Schema managed exclusively by Liquibase
+  liquibase:
     enabled: true
-    locations: classpath:db/migration
+    change-log: classpath:db/changelog/db.changelog-master.xml
   security:
     oauth2:
       client:

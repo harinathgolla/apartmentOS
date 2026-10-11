@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.29.xsd">
+
+    <changeSet id="013-create-indexes" author="apartment-saas">
+        <createIndex tableName="rent_records" indexName="idx_rent_apt_ym">
+            <column name="apartment_id"/>
+            <column name="year"/>
+            <column name="month"/>
+        </createIndex>
+        <createIndex tableName="meter_readings" indexName="idx_meter_apt_ym">
+            <column name="apartment_id"/>
+            <column name="year"/>
+            <column name="month"/>
+        </createIndex>
+        <createIndex tableName="expenses" indexName="idx_exp_apt_date">
+            <column name="apartment_id"/>
+            <column name="expense_date"/>
+        </createIndex>
+        <createIndex tableName="invoices" indexName="idx_inv_apt_status">
+            <column name="apartment_id"/>
+            <column name="status"/>
+        </createIndex>
+        <createIndex tableName="users" indexName="idx_users_org">
+            <column name="org_id"/>
+        </createIndex>
+        <createIndex tableName="rent_records" indexName="idx_rent_paid">
+            <column name="apartment_id"/>
+            <column name="paid"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.29.xsd">
+
+    <!--
+      Master changelog for Apartment SaaS.
+      All changesets are written in DB-agnostic XML so the same changelog can run
+      against PostgreSQL (current) and MySQL (target) without modification.
+
+      Include order matters: parents before children (FK dependencies).
+    -->
+
+    <include file="db/changelog/changes/001-orgs.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/002-users.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/003-apartments.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/004-flats.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/005-tenancies.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/006-meter-readings.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/007-rent-records.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/008-expenses.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/009-invoices.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/010-payments.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/011-reminders.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/012-audit-log.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/013-indexes.xml" relativeToChangelogFile="false"/>
+
+</databaseChangeLog>

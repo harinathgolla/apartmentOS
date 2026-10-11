@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.29.xsd">
+
+    <changeSet id="008-create-expenses" author="apartment-saas">
+        <createTable tableName="expenses">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="apartment_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="category" type="VARCHAR(40)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="subcategory" type="VARCHAR(80)"/>
+            <column name="amount" type="DECIMAL(12,2)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="expense_date" type="DATE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="vendor" type="VARCHAR(255)"/>
+            <column name="invoice_no" type="VARCHAR(80)"/>
+            <column name="notes" type="CLOB"/>
+            <column name="receipt_url" type="CLOB"/>
+            <column name="created_by" type="BIGINT"/>
+            <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"/>
+        </createTable>
+        <addForeignKeyConstraint baseTableName="expenses" baseColumnNames="created_by"
+                                 referencedTableName="users" referencedColumnNames="id"
+                                 constraintName="fk_expenses_user"/>
+    </changeSet>
+
+</databaseChangeLog>

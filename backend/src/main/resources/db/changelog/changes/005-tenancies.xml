@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.29.xsd">
+
+    <changeSet id="005-create-tenancies" author="apartment-saas">
+        <createTable tableName="tenancies">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="flat_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="apartment_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="tenant_user_id" type="BIGINT"/>
+            <column name="tenant_name" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="tenant_phone" type="VARCHAR(32)"/>
+            <column name="tenant_email" type="VARCHAR(255)"/>
+            <column name="agreement_start" type="DATE"/>
+            <column name="agreement_end" type="DATE"/>
+            <column name="rent_amount" type="DECIMAL(12,2)"/>
+            <column name="security_deposit" type="DECIMAL(12,2)"/>
+            <column name="deposit_refunded" type="DECIMAL(12,2)" defaultValueNumeric="0"/>
+            <column name="frequency" type="VARCHAR(20)" defaultValue="MONTHLY"/>
+            <column name="due_day" type="INT" defaultValueNumeric="5"/>
+            <column name="active" type="BIT" defaultValueBoolean="true"/>
+            <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"/>
+        </createTable>
+        <addForeignKeyConstraint baseTableName="tenancies" baseColumnNames="flat_id"
+                                 referencedTableName="flats" referencedColumnNames="id"
+                                 constraintName="fk_tenancies_flat" onDelete="CASCADE"/>
+        <addForeignKeyConstraint baseTableName="tenancies" baseColumnNames="tenant_user_id"
+                                 referencedTableName="users" referencedColumnNames="id"
+                                 constraintName="fk_tenancies_user"/>
+    </changeSet>
+
+</databaseChangeLog>

@@ -18,6 +18,10 @@ build/
 *.tsbuildinfo
 next-env.d.ts
 
+# ── DB backups ─────────────────────────────────────────
+backups/
+*.sql.dump
+
 # ── Environment / secrets ──────────────────────────────
 .env
 .env.local

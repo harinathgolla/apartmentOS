@@ -1,8 +1,9 @@
 spring:
   datasource:
-    url: jdbc:postgresql://postgres:5432/${POSTGRES_DB:apartment_db}
-    username: ${POSTGRES_USER:postgres}
-    password: ${POSTGRES_PASSWORD:postgres}
+    url: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:apartment_db}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: ${MYSQL_USER:apartment}
+    password: ${MYSQL_PASSWORD:apartment}
   jpa:
     hibernate:
       ddl-auto: validate

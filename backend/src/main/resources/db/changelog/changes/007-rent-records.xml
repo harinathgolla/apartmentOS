@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.29.xsd">
+
+    <changeSet id="007-create-rent-records" author="apartment-saas">
+        <createTable tableName="rent_records">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="tenancy_id" type="BIGINT"/>
+            <column name="flat_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="apartment_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="tenant_name" type="VARCHAR(255)"/>
+            <column name="month" type="VARCHAR(12)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="year" type="INT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="rent_amount" type="DECIMAL(12,2)" defaultValueNumeric="0"/>
+            <column name="ebill_amount" type="DECIMAL(12,2)" defaultValueNumeric="0"/>
+            <column name="water_bill" type="DECIMAL(12,2)" defaultValueNumeric="0"/>
+            <column name="maintenance_charge" type="DECIMAL(12,2)" defaultValueNumeric="0"/>
+            <column name="total_collected" type="DECIMAL(12,2)" defaultValueNumeric="0"/>
+            <column name="house_maid" type="DECIMAL(12,2)" defaultValueNumeric="0"/>
+            <column name="garbage_vehicle" type="DECIMAL(12,2)" defaultValueNumeric="0"/>
+            <column name="generator_diesel" type="DECIMAL(12,2)" defaultValueNumeric="0"/>
+            <column name="shared_ebill" type="DECIMAL(12,2)" defaultValueNumeric="0"/>
+            <column name="emi_interest" type="DECIMAL(12,2)" defaultValueNumeric="0"/>
+            <column name="property_tax" type="DECIMAL(12,2)" defaultValueNumeric="0"/>
+            <column name="insurance" type="DECIMAL(12,2)" defaultValueNumeric="0"/>
+            <column name="repairs" type="DECIMAL(12,2)" defaultValueNumeric="0"/>
+            <column name="other_expenses" type="DECIMAL(12,2)" defaultValueNumeric="0"/>
+            <column name="returns_amount" type="DECIMAL(12,2)" defaultValueNumeric="0"/>
+            <column name="net_income" type="DECIMAL(14,2)"/>
+            <column name="cumulative_total" type="DECIMAL(14,2)"/>
+            <column name="payment_mode" type="VARCHAR(20)"/>
+            <column name="paid" type="BIT" defaultValueBoolean="false"/>
+            <column name="paid_date" type="DATE"/>
+            <column name="remarks" type="VARCHAR(500)"/>
+            <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"/>
+        </createTable>
+        <addForeignKeyConstraint baseTableName="rent_records" baseColumnNames="tenancy_id"
+                                 referencedTableName="tenancies" referencedColumnNames="id"
+                                 constraintName="fk_rent_tenancy" onDelete="CASCADE"/>
+        <addUniqueConstraint tableName="rent_records" columnNames="tenancy_id, year, month"
+                             constraintName="uk_rent_tenancy_ym"/>
+    </changeSet>
+
+</databaseChangeLog>

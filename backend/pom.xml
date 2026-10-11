@@ -26,9 +26,10 @@
     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-cache</artifactId></dependency>
     <dependency><groupId>com.github.ben-manes.caffeine</groupId><artifactId>caffeine</artifactId></dependency>
 
-    <!-- Flyway (Spring Boot 4 requires the starter) -->
-    <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-flyway</artifactId></dependency>
-    <dependency><groupId>org.flywaydb</groupId><artifactId>flyway-database-postgresql</artifactId></dependency>
+    <!-- Liquibase (sole schema migration tool; DB-agnostic XML changelogs).
+         The STARTER is required so Spring Boot loads LiquibaseAutoConfiguration;
+         raw liquibase-core alone is silently ignored by Spring Boot 4. -->
+    <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-liquibase</artifactId></dependency>
 
     <!-- Gmail API (send as user) -->
     <dependency><groupId>com.google.api-client</groupId><artifactId>google-api-client</artifactId><version>2.6.0</version></dependency>
@@ -49,8 +50,8 @@
     <dependency><groupId>io.jsonwebtoken</groupId><artifactId>jjwt-impl</artifactId><version>0.12.6</version><scope>runtime</scope></dependency>
     <dependency><groupId>io.jsonwebtoken</groupId><artifactId>jjwt-jackson</artifactId><version>0.12.6</version><scope>runtime</scope></dependency>
 
-    <!-- DB / Lombok -->
-    <dependency><groupId>org.postgresql</groupId><artifactId>postgresql</artifactId><scope>runtime</scope></dependency>
+    <!-- DB driver: MySQL -->
+    <dependency><groupId>com.mysql</groupId><artifactId>mysql-connector-j</artifactId><scope>runtime</scope></dependency>
     <dependency><groupId>org.projectlombok</groupId><artifactId>lombok</artifactId><optional>true</optional></dependency>
 
     <!-- Test -->
@@ -60,5 +61,19 @@
   </dependencies>
   <build><plugins>
     <plugin><groupId>org.springframework.boot</groupId><artifactId>spring-boot-maven-plugin</artifactId></plugin>
+
+    <!-- Liquibase Maven plugin: run migrations directly, e.g.
+           mvn liquibase:update -Dliquibase.url=jdbc:postgresql://localhost:5432/apartment_db ... -->
+    <plugin>
+      <groupId>org.liquibase</groupId>
+      <artifactId>liquibase-maven-plugin</artifactId>
+      <configuration>
+        <changeLogFile>src/main/resources/db/changelog/db.changelog-master.xml</changeLogFile>
+        <url>jdbc:postgresql://localhost:5432/apartment_db</url>
+        <username>postgres</username>
+        <password>postgres</password>
+        <driver>org.postgresql.Driver</driver>
+      </configuration>
+    </plugin>
   </plugins></build>
 </project>

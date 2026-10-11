@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.29.xsd">
+
+    <changeSet id="009-create-invoices" author="apartment-saas">
+        <createTable tableName="invoices">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="apartment_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="flat_id" type="BIGINT"/>
+            <column name="tenancy_id" type="BIGINT"/>
+            <column name="invoice_no" type="VARCHAR(40)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+            <column name="kind" type="VARCHAR(20)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="month" type="VARCHAR(12)"/>
+            <column name="year" type="INT"/>
+            <!-- line_items stored as JSON text; DB-agnostic (TEXT/CLOB) for MySQL + Postgres -->
+            <column name="line_items" type="CLOB">
+                <constraints nullable="false"/>
+            </column>
+            <column name="subtotal" type="DECIMAL(12,2)"/>
+            <column name="tax" type="DECIMAL(12,2)"/>
+            <column name="total" type="DECIMAL(12,2)"/>
+            <column name="status" type="VARCHAR(20)" defaultValue="DRAFT"/>
+            <column name="due_date" type="DATE"/>
+            <column name="paid_at" type="TIMESTAMP"/>
+            <column name="pdf_url" type="CLOB"/>
+            <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"/>
+        </createTable>
+    </changeSet>
+
+</databaseChangeLog>

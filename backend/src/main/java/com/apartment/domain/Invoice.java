@@ -16,7 +16,7 @@ public class Invoice {
     private String kind;
     private String month;
     private Integer year;
-    @Column(columnDefinition="jsonb") private String lineItems;
+    @Column(columnDefinition="TEXT") private String lineItems;
     private BigDecimal subtotal;
     private BigDecimal tax;
     private BigDecimal total;
