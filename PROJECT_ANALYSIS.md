@@ -9,9 +9,9 @@
 
 **Apartment SaaS** is a multi-tenant property/rental management platform targeting apartment owners and tenants (Indian market — INR billing via Razorpay). It handles rent collection, electricity/meter billing, expense tracking, P&L reporting, automated email reminders, subscription billing, and Excel import.
 
-- **Backend:** Spring Boot 4.0.8 · Java 21 · PostgreSQL · Redis · Flyway
+- **Backend:** Spring Boot 4.0.8 · Java 21 · **MySQL 8.4** · Redis · **Liquibase**
 - **Frontend:** Next.js 14.2.15 · React 18 · TypeScript · Tailwind CSS · Radix UI
-- **Infra:** Docker Compose (Postgres, Redis, pgAdmin, MailHog, mock-oauth2, Nginx)
+- **Infra:** Docker Compose (MySQL, Redis, MailHog, mock-oauth2, Nginx)
 
 ---
 
@@ -28,8 +28,6 @@ apartment-saas/
     ├── .env / .env.example
     ├── docker-compose.yml
     ├── docker-compose.override.yml
-    ├── postgres/             # Custom Postgres image + init SQL
-    ├── pgadmin/              # servers.json
     ├── redis/                # redis.conf
     ├── mailhog/  (via image)
     ├── mock-oauth/           # config.json
@@ -49,8 +47,8 @@ apartment-saas/
 | Language | Java **21** (virtual threads enabled) |
 | Web | spring-boot-starter-web |
 | Persistence | Spring Data JPA + Hibernate |
-| DB | PostgreSQL (runtime driver) |
-| Migrations | **Flyway** (spring-boot-starter-flyway + flyway-database-postgresql) |
+| DB | **MySQL 8.4** (com.mysql:mysql-connector-j) |
+| Migrations | **Liquibase** (spring-boot-starter-liquibase + DB-agnostic XML changelogs) |
 | Security | Spring Security + OAuth2 Client + JJWT 0.12.6 |
 | Caching | Spring Cache + Caffeine |
 | Mail | spring-boot-starter-mail + **Gmail API** (google-api-services-gmail) |
@@ -80,17 +78,18 @@ apartment-saas/
 
 | Container | Image | Port(s) | Status |
 |---|---|---|---|
-| `apt-postgres` | `apartment-saas/postgres:16` | 5432 | Up 8h (healthy) |
-| `apt-redis` | `redis:7-alpine` | 6379 | Up 9h (healthy) |
-| `apt-pgadmin` | `dpage/pgadmin4:latest` | 5050 → 80 | Up 9h |
-| `apt-mock-oauth` | `ghcr.io/navikt/mock-oauth2-server:2.1.10` | 9000 → 8080 | Up 9h |
-| `apt-mailhog` | `mailhog/mailhog:latest` | 1025, 8025 | Up 9h |
+| `apt-mysql` | `mysql:8.4` | 3307 → 3306 | Up (healthy) |
+| `apt-backend` | `apartment-saas/backend:latest` | 8080 | Up (healthy) |
+| `apt-frontend` | `apartment-saas/frontend:latest` | 3000 | Up |
+| `apt-redis` | `redis:7-alpine` | 6379 | Up (healthy) |
+| `apt-mock-oauth` | `ghcr.io/navikt/mock-oauth2-server:2.1.10` | 9000 → 8080 | Up |
+| `apt-mailhog` | `mailhog/mailhog:latest` | 1025, 8025 | Up |
 
 ### Compose Profiles (`docker-compose.yml`)
 
 | Profile | Services included |
 |---|---|
-| default | postgres, pgadmin, redis, mock-oauth |
+| default | mysql, redis, mock-oauth |
 | `dev` | + mailhog |
 | `full` | + backend, frontend |
 | `prod` | + nginx (reverse proxy) |
@@ -100,7 +99,7 @@ apartment-saas/
 ### Networks & Volumes
 
 - Network: `apartment-net` (bridge)
-- Volumes: `postgres_data`, `pgadmin_data`, `redis_data`
+- Volumes: `mysql_data`, `redis_data`
 
 ### Nginx (prod)
 
@@ -116,12 +115,11 @@ apartment-saas/
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `POSTGRES_DB` | apartment_db | DB name |
-| `POSTGRES_USER` | postgres | DB user |
-| `POSTGRES_PASSWORD` | postgres | DB password |
-| `POSTGRES_PORT` | 5432 | DB port |
-| `PGADMIN_EMAIL` / `PGADMIN_PASSWORD` | admin@… / admin | pgAdmin login |
-| `PGADMIN_PORT` | 5050 | pgAdmin UI |
+| `MYSQL_DATABASE` | apartment_db | DB name |
+| `MYSQL_USER` | apartment | DB user |
+| `MYSQL_PASSWORD` | apartment | DB password |
+| `MYSQL_ROOT_PASSWORD` | rootpassword | MySQL root password |
+| `MYSQL_PORT` | 3307 (host) | DB port (host; container stays 3306) |
 | `REDIS_PORT` / `REDIS_PASSWORD` | 6379 / redis_dev_pw | Redis |
 | `MAILHOG_SMTP_PORT` / `MAILHOG_UI_PORT` | 1025 / 8025 | Mail catcher |
 | `BACKEND_PORT` | 8080 | Spring Boot |
@@ -139,7 +137,8 @@ apartment-saas/
 | Profile | File | Notes |
 |---|---|---|
 | default | `application.yml` | localhost DB, real Gmail SMTP, JWT, Razorpay plans |
-| `docker` | `application-docker.yml` | Container hostnames; **references Liquibase** (change-log path configured — potential mismatch, see §10) |
+| `docker` | `application-docker.yml` | Container hostnames; MySQL datasource; **Liquibase** enabled |
+| `liquibase` | `application-liquibase.yml` | Dedicated Liquibase migration profile (with optional `mysql` sub-profile) |
 | `mock-oauth` | `application-mock-oauth.yml` | Routes Google OAuth → localhost:9000 mock; mail → MailHog |
 
 ### Subscription Plans (`application.yml` → `app.billing.plans`)
@@ -219,32 +218,48 @@ com/apartment/
 
 ---
 
-## 7. Database Schema (Flyway Migrations)
+## 7. Database Schema (Liquibase XML Changelogs)
 
-### V1__init.sql — core tables
+Managed by **Liquibase** via `backend/src/main/resources/db/changelog/db.changelog-master.xml`, which includes 13 changesets (`changes/001`–`013`). All changesets are **DB-agnostic XML** (target DB: **MySQL 8.4**). Tracking tables: `DATABASECHANGELOG`, `DATABASECHANGELOGLOCK`.
+
+### Changelog files (changes/)
+
+| File | Contents |
+|---|---|
+| `001-orgs.xml` | `orgs` table |
+| `002-users.xml` | `users` table (+ FK org_id) |
+| `003-apartments.xml` | `apartments` table (+ FK org_id) |
+| `004-flats.xml` | `flats` table (+ FK, unique apt+flat_no) |
+| `005-tenancies.xml` | `tenancies` table (+ FKs, `frequency`, `due_day`, `active`) |
+| `006-meter-readings.xml` | `meter_readings` (+ FK, unique flat+ym) |
+| `007-rent-records.xml` | `rent_records` (+ FK, unique tenancy+ym, `payment_mode`, `paid`) |
+| `008-expenses.xml` | `expenses` (+ FK created_by) |
+| `009-invoices.xml` | `invoices` (line_items as CLOB/TEXT) |
+| `010-payments.xml` | `payments` (+ FKs) |
+| `011-reminders.xml` | `reminders` |
+| `012-audit-log.xml` | `audit_log` |
+| `013-indexes.xml` | 6 indexes (rent, meter, expenses, invoices, users, rent_paid) |
+
+### Core tables (created by Liquibase)
 
 | Table | Key columns |
 |---|---|
 | `orgs` | name, slug, plan, trial_ends_at, razorpay_customer_id/subscription_id, billing_email |
-| `users` | org_id, email (unique), password_hash, role, google_refresh_token, google_connected |
+| `users` | org_id, email (unique), password_hash, role, google_refresh_token, google_connected (BIT) |
 | `apartments` | org_id, address, purchase_value/date, loan_amount/emi/interest_rate |
 | `flats` | apartment_id, flat_no (unique per apt), area_sqft, meter_serial_no, owner_share_pct |
-| `tenancies` | flat_id, tenant_user_id, rent_amount, security_deposit, rent_due_day, active |
+| `tenancies` | flat_id, tenant_user_id, rent_amount, security_deposit, due_day, frequency, active (BIT) |
 | `meter_readings` | flat_id, year+month (unique), previous/present reading, usage_units, rate, bill |
-| `rent_records` | tenancy_id, month+year (unique), rent/ebill/water/maintenance, many expense fields, net_income, cumulative_total, paid |
+| `rent_records` | tenancy_id, month+year (unique), rent/ebill/water/maintenance, many expense fields, net_income, cumulative_total, payment_mode, paid (BIT) |
 | `expenses` | apartment_id, category, amount, expense_date, vendor, receipt_url |
-| `invoices` | invoice_no (unique), kind, line_items (JSONB), subtotal/tax/total, status |
+| `invoices` | invoice_no (unique), kind, line_items (TEXT/CLOB), subtotal/tax/total, status |
 | `payments` | invoice_id, amount, mode, reference |
 | `reminders` | apartment_id, tenancy_id, recipient_email, subject, body, status, sent_at |
-| `audit_log` | org_id, user_id, entity, action, before_json/after_json (JSONB) |
+| `audit_log` | org_id, user_id, entity, action, before_json/after_json (TEXT/CLOB) |
 
-Indexes on `rent_records(apartment_id, year, month)`, `meter_readings`, `expenses`, `invoices`, `users(org_id)`.
+Indexes: `idx_rent_apt_ym`, `idx_meter_apt_ym`, `idx_exp_apt_date`, `idx_inv_apt_status`, `idx_users_org`, `idx_rent_paid`.
 
-### V2__rent_collection.sql
-
-- Adds `tenancies.frequency` (default MONTHLY), `tenancies.due_day`
-- Adds `rent_records.payment_mode`
-- Index `idx_rent_paid` on `rent_records(apartment_id, paid)`
+> **Note:** boolean columns (`users.google_connected`, `tenancies.active`, `rent_records.paid`) are defined as `BIT` in the changelogs so they map to MySQL `BIT(1)`, which Hibernate's MySQL dialect expects for Java `Boolean` (Liquibase's default `BOOLEAN`→`TINYINT` fails Hibernate `validate`).
 
 ---
 
@@ -326,13 +341,14 @@ Dashboard, Electricity (meter), Expenses, Import (Excel), P&L, Reminders, Rent, 
 
 ## 10. Observations & Potential Issues
 
-1. **Profile config inconsistency (`docker` profile):** `application-docker.yml` enables **Liquibase** (`db/changelog/db.changelog-master.xml`), but the project uses **Flyway** migrations (`db/migration/V*.sql`). No `db/changelog/` directory was found in resources. This would likely fail at startup if the `docker` profile is used with Liquibase enabled — verify before running the `full` profile.
-2. **Secrets in defaults:** JWT secret, DB password, Razorpay keys, and pgAdmin credentials have insecure dev defaults in `.env.example` and `application.yml`. Ensure real values via env in any non-dev environment.
-3. **`Google OAuth` in docker profile:** scopes list omits `gmail.send` (present in default profile), so Gmail API sending may not work under `docker`.
-4. **Two migration tools referenced:** Flyway is the actual tool (starter + PostgreSQL module + migration files); Liquibase config appears vestigial.
-5. **No docker healthchecks** for pgadmin, mailhog, mock-oauth (only postgres & redis define them).
-6. **`.env` file present** in `containers/` (git-ignored per `.gitignore` — confirm it stays out of VCS).
-7. **CORS:** `SecurityConfig` calls `.cors(c -> {})` enabling defaults; actual allowed origins are in `CorsConfig` (not inspected here).
+1. **Resolved — migration tool:** The project now uses **Liquibase exclusively**. Flyway (deps, config, `db/migration/V*.sql`) was removed. `spring-boot-starter-liquibase` is required (raw `liquibase-core` is silently ignored by Spring Boot 4's autoconfiguration).
+2. **Resolved — DB is MySQL 8.4.** Postgres + pgAdmin services, volumes, and directories removed. Host port **3307** maps to container 3306 (host 3306 is occupied by a native MySQL on this machine).
+3. **Secrets in defaults:** JWT secret, DB password, Razorpay keys have insecure dev defaults in `.env.example` and `application.yml`. Ensure real values via env in any non-dev environment.
+4. **`Google OAuth` in docker profile:** scopes list omits `gmail.send` (present in default profile), so Gmail API sending may not work under `docker`.
+5. **No docker healthchecks** for mailhog, mock-oauth (mysql, redis, backend define them).
+6. **`.env` file present** in `containers/` (git-ignored per `.gitignore`).
+7. **CORS:** `SecurityConfig` calls `.cors(c -> {})` enabling defaults; actual allowed origins are in `CorsConfig`.
+8. **Changelog checksum discipline:** do not edit an already-applied changeset; add a new changeset instead, or checksum validation will fail on next startup.
 
 ---
 
@@ -361,10 +377,9 @@ cd containers && ./scripts/up.sh prod
 |---|---|
 | Frontend | http://localhost:3000 |
 | Backend API | http://localhost:8080 |
-| pgAdmin | http://localhost:5050 |
+| MySQL | localhost:3307 (→ container 3306) |
 | MailHog UI | http://localhost:8025 |
 | Mock OAuth | http://localhost:9000 |
-| Postgres | localhost:5432 |
 | Redis | localhost:6379 |
 | App via Nginx (prod) | http://localhost:80 |
 
@@ -374,8 +389,8 @@ cd containers && ./scripts/up.sh prod
 
 Apartment SaaS is a well-structured, modern multi-tenant rental management platform:
 
-- **Backend:** clean layered Spring Boot 4 app (controller → service → repo → domain) with JWT + Google OAuth, Flyway migrations, dual mailers, Razorpay billing, POI Excel import, and OpenPDF invoicing.
+- **Backend:** clean layered Spring Boot 4 app (controller → service → repo → domain) with JWT + Google OAuth, **Liquibase** migrations, dual mailers, Razorpay billing, POI Excel import, and OpenPDF invoicing.
 - **Frontend:** Next.js App Router with Radix/Tailwind UI, dedicated owner and tenant portals, charts, and a token-based Axios client.
-- **Infra:** profile-driven Docker Compose supporting three run modes (infra / full / prod) with a full local dev stack (Postgres, Redis, pgAdmin, MailHog, mock OAuth) and Nginx for production.
+- **Infra:** profile-driven Docker Compose supporting three run modes (infra / full / prod) with a local dev stack (**MySQL 8.4**, Redis, MailHog, mock OAuth) and Nginx for production.
 
-The main thing to fix before containerized full-stack runs is the **Liquibase vs Flyway** discrepancy in `application-docker.yml`.
+The DB layer is now **MySQL 8.4** with **Liquibase** as the sole migration tool (13 DB-agnostic XML changesets). The earlier Postgres/Flyway setup was fully removed and the full stack was verified running (backend healthy, all 14 tables created by Liquibase).
