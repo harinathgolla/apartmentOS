@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.29.xsd">
+
+    <!--
+      022 - Common-area meter maintenance split.
+      split_mode = EQUAL (auto divide across active flats) | MANUAL (owner enters figures).
+      Records the per-flat share actually applied for a period.
+    -->
+    <changeSet id="022-common-meter-split" author="apartment-saas">
+        <addColumn tableName="common_meter_readings">
+            <column name="split_mode" type="VARCHAR(20)" defaultValue="EQUAL"/>
+            <column name="per_flat_share" type="DECIMAL(12,2)"/>
+        </addColumn>
+    </changeSet>
+
+</databaseChangeLog>

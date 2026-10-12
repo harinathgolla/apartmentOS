@@ -22,6 +22,7 @@ type Flat = {
   id: number; flatNo: string; floor?: number | null;
   meterSerialNo?: string | null; areaSqft?: number | null;
   bedrooms?: number | null; apartmentId: number;
+  nominalElectricityAmount?: number | null; nominalWaterAmount?: number | null;
 };
 type Tenancy = {
   id: number; flatId: number; apartmentId: number;
@@ -29,6 +30,7 @@ type Tenancy = {
   rentAmount?: number; securityDeposit?: number;
   agreementStart?: string; agreementEnd?: string;
   frequency?: string; dueDay?: number;
+  tenancyType?: string; maintenanceAmount?: number;
   active: boolean;
 };
 type Filter = "active" | "inactive" | "all";
@@ -489,6 +491,8 @@ function FlatFormModal({
     meterSerialNo: flat?.meterSerialNo ?? "",
     areaSqft: flat?.areaSqft != null ? String(flat.areaSqft) : "",
     bedrooms: flat?.bedrooms != null ? String(flat.bedrooms) : "",
+    nominalElectricityAmount: flat?.nominalElectricityAmount != null ? String(flat.nominalElectricityAmount) : "",
+    nominalWaterAmount: flat?.nominalWaterAmount != null ? String(flat.nominalWaterAmount) : "",
   });
   const [busy, setBusy] = useState(false);
 
@@ -521,6 +525,8 @@ function FlatFormModal({
         meterSerialNo: form.meterSerialNo.trim() || null,
         areaSqft: form.areaSqft ? Number(form.areaSqft) : null,
         bedrooms: form.bedrooms ? Number(form.bedrooms) : null,
+        nominalElectricityAmount: form.nominalElectricityAmount ? Number(form.nominalElectricityAmount) : null,
+        nominalWaterAmount: form.nominalWaterAmount ? Number(form.nominalWaterAmount) : null,
       };
       if (isEdit && flat) {
         toast.info("Editing flats is coming next — delete and re-add for now");
@@ -623,6 +629,24 @@ function FlatFormModal({
               placeholder="1200"
             />
           </div>
+          <div>
+            <Label>Nominal electricity (Rs / month)</Label>
+            <Input
+              type="number"
+              value={form.nominalElectricityAmount}
+              onChange={(e) => setForm({ ...form, nominalElectricityAmount: e.target.value })}
+              placeholder="For flats without a meter"
+            />
+          </div>
+          <div>
+            <Label>Nominal water (Rs / month)</Label>
+            <Input
+              type="number"
+              value={form.nominalWaterAmount}
+              onChange={(e) => setForm({ ...form, nominalWaterAmount: e.target.value })}
+              placeholder="For flats without a meter"
+            />
+          </div>
         </div>
 
         <div className="flex items-center justify-between gap-2 p-4 md:p-5 border-t border-border/60 shrink-0">
@@ -684,6 +708,8 @@ function TenantFormModal({
     endDate: tenant?.agreementEnd ?? "",
     frequency: tenant?.frequency ?? "MONTHLY",
     dueDay: tenant?.dueDay != null ? String(tenant.dueDay) : "5",
+    tenancyType: tenant?.tenancyType ?? "RENTAL",
+    maintenanceAmount: tenant?.maintenanceAmount != null ? String(tenant.maintenanceAmount) : "",
   });
   const [busy, setBusy] = useState(false);
 
@@ -728,6 +754,8 @@ function TenantFormModal({
           active: tenant.active,
           frequency: form.frequency,
           dueDay: form.dueDay ? Number(form.dueDay) : 5,
+          tenancyType: form.tenancyType,
+          maintenanceAmount: form.maintenanceAmount ? Number(form.maintenanceAmount) : null,
         });
         toast.success("Tenant updated");
       } else {
@@ -744,6 +772,8 @@ function TenantFormModal({
           endDate: form.endDate || null,
           frequency: form.frequency,
           dueDay: form.dueDay ? Number(form.dueDay) : 5,
+          tenancyType: form.tenancyType,
+          maintenanceAmount: form.maintenanceAmount ? Number(form.maintenanceAmount) : null,
         });
         toast.success("Tenant onboarded");
       }
@@ -917,6 +947,31 @@ function TenantFormModal({
             />
             <p className="text-xs text-muted-foreground mt-1">
               Rent reminders fire on this day each month.
+            </p>
+          </div>
+
+          <div>
+            <Label>Tenancy type</Label>
+            <select
+              className="h-10 w-full rounded-lg border bg-background px-3 text-sm"
+              value={form.tenancyType}
+              onChange={(e) => setForm({ ...form, tenancyType: e.target.value })}
+            >
+              <option value="RENTAL">Rental (monthly, ~11 months)</option>
+              <option value="LEASE">Lease (fixed term)</option>
+            </select>
+          </div>
+
+          <div>
+            <Label>Maintenance amount (Rs / month)</Label>
+            <Input
+              type="number"
+              value={form.maintenanceAmount}
+              onChange={(e) => setForm({ ...form, maintenanceAmount: e.target.value })}
+              placeholder="1500"
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Stated separately in the agreement; collected monthly.
             </p>
           </div>
 

@@ -33,6 +33,7 @@ public class WaterService {
         m.setRatePerUnit(rate);
         m.setUsageUnits(usage);
         m.setBillAmount(usage.multiply(rate));
+        if (r.meterId() != null) m.setMeterId(r.meterId());
         if (r.paid() != null) {
             m.setPaid(r.paid());
             m.setPaidDate(r.paid() ? LocalDate.now() : null);

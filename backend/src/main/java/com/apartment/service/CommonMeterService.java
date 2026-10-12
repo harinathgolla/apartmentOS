@@ -5,6 +5,7 @@ import com.apartment.domain.Expense;
 import com.apartment.dto.AuthDtos.CommonMeterReadingRequest;
 import com.apartment.repo.CommonMeterReadingRepository;
 import com.apartment.repo.ExpenseRepository;
+import com.apartment.repo.TenancyRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,8 +19,15 @@ public class CommonMeterService {
 
     private final CommonMeterReadingRepository repo;
     private final ExpenseRepository expenses;
+    private final TenancyRepository tenancies;
 
     private BigDecimal nz(BigDecimal b) { return b == null ? BigDecimal.ZERO : b; }
+
+    private CommonMeterReading.SplitMode parseSplitMode(String s) {
+        if (s == null || s.isBlank()) return CommonMeterReading.SplitMode.EQUAL;
+        try { return CommonMeterReading.SplitMode.valueOf(s.toUpperCase()); }
+        catch (IllegalArgumentException e) { return CommonMeterReading.SplitMode.EQUAL; }
+    }
 
     @Transactional
     public CommonMeterReading upsert(Long aptId, Long userId, CommonMeterReadingRequest r) {
@@ -28,6 +36,16 @@ public class CommonMeterService {
         BigDecimal rate = r.ratePerUnit() != null ? r.ratePerUnit() : BigDecimal.ZERO;
         BigDecimal usage = pres.subtract(prev);
         BigDecimal bill = usage.multiply(rate);
+
+        CommonMeterReading.SplitMode splitMode = parseSplitMode(r.splitMode());
+        BigDecimal perFlatShare;
+        if (splitMode == CommonMeterReading.SplitMode.MANUAL) {
+            perFlatShare = r.perFlatShare() != null ? r.perFlatShare() : BigDecimal.ZERO;
+        } else {
+            // EQUAL — divide across active flats (advisory; owner may override at rent-collect)
+            int activeFlats = Math.max(1, tenancies.findByApartmentIdAndActiveTrue(aptId).size());
+            perFlatShare = bill.divide(BigDecimal.valueOf(activeFlats), 2, java.math.RoundingMode.HALF_UP);
+        }
 
         CommonMeterReading m = CommonMeterReading.builder()
                 .apartmentId(aptId)
@@ -40,6 +58,8 @@ public class CommonMeterService {
                 .ratePerUnit(rate)
                 .billAmount(bill)
                 .recoverFromTenants(Boolean.TRUE.equals(r.recoverFromTenants()))
+                .splitMode(splitMode)
+                .perFlatShare(perFlatShare)
                 .createdBy(userId)
                 .build();
         m = repo.save(m);

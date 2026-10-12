@@ -9,6 +9,7 @@ import java.time.LocalDate;
 public class WaterReading {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY) private Long id;
     private Long flatId;
+    private Long meterId;
     private Long apartmentId;
     private Integer year;
     private String month;

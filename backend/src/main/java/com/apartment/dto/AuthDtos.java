@@ -18,17 +18,20 @@ public class AuthDtos {
                                    BigDecimal loanAmount, BigDecimal loanEmi,
                                    BigDecimal loanInterestRate) {}
     public record FlatRequest(@NotBlank String flatNo, Integer floor, String meterSerialNo,
-                              String ownerName, String ownerPhone, BigDecimal areaSqft, Integer bedrooms) {}
+                              String ownerName, String ownerPhone, BigDecimal areaSqft, Integer bedrooms,
+                              BigDecimal nominalElectricityAmount, BigDecimal nominalWaterAmount) {}
 
     public record TenantRequest(@NotBlank String tenantName, String tenantPhone, String tenantEmail,
                                 @NotNull Long flatId, BigDecimal rentAmount, BigDecimal securityDeposit,
                                 LocalDate startDate, LocalDate endDate,
-                                String frequency, Integer dueDay) {}
+                                String frequency, Integer dueDay,
+                                String tenancyType, BigDecimal maintenanceAmount) {}
 
     public record TenantUpdateRequest(String tenantName, String tenantPhone, String tenantEmail,
                                       BigDecimal rentAmount, BigDecimal securityDeposit,
                                       LocalDate startDate, LocalDate endDate, Boolean active,
-                                      String frequency, Integer dueDay) {}
+                                      String frequency, Integer dueDay,
+                                      String tenancyType, BigDecimal maintenanceAmount) {}
 
     public record CollectRentRequest(@NotNull Long tenancyId, @NotBlank String month, @NotNull Integer year,
                                      BigDecimal rentAmount, BigDecimal ebillAmount,
@@ -41,7 +44,11 @@ public class AuthDtos {
 
     public record MeterReadingRequest(@NotNull Long flatId, @NotNull Integer year, @NotBlank String month,
                                       BigDecimal previousReading, BigDecimal presentReading,
-                                      BigDecimal ratePerUnit, Boolean paid) {}
+                                      BigDecimal ratePerUnit, Boolean paid, Long meterId) {}
+
+    public record MeterRequest(Long flatId, String label, String serialNo,
+                               @NotBlank String utilityType, String scope,
+                               BigDecimal ratePerUnit, Boolean active) {}
     public record ReminderRequest(String month, Integer year, String customMessage, Boolean sendToAll) {}
     public record ExpenseRequest(Long apartmentId, @NotBlank String category, String subcategory,
                                  @NotNull BigDecimal amount, @NotNull LocalDate expenseDate,
@@ -55,9 +62,10 @@ public class AuthDtos {
 
     public record CommonMeterReadingRequest(String label, @NotNull Integer year, @NotBlank String month,
                                             BigDecimal previousReading, BigDecimal presentReading,
-                                            BigDecimal ratePerUnit, Boolean recoverFromTenants) {}
+                                            BigDecimal ratePerUnit, Boolean recoverFromTenants,
+                                            String splitMode, BigDecimal perFlatShare) {}
 
     public record WaterReadingRequest(@NotNull Long flatId, @NotNull Integer year, @NotBlank String month,
                                       BigDecimal previousReading, BigDecimal presentReading,
-                                      BigDecimal ratePerUnit, Boolean paid) {}
+                                      BigDecimal ratePerUnit, Boolean paid, Long meterId) {}
 }

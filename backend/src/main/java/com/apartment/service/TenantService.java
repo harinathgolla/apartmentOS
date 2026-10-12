@@ -64,6 +64,8 @@ public class TenantService {
                 .agreementEnd(r.endDate())
                 .frequency(freq)
                 .dueDay(r.dueDay() != null ? r.dueDay() : 5)
+                .tenancyType(parseTenancyType(r.tenancyType()))
+                .maintenanceAmount(r.maintenanceAmount() != null ? r.maintenanceAmount() : java.math.BigDecimal.ZERO)
                 .active(true)
                 .build();
         return tenancies.save(t);
@@ -99,6 +101,8 @@ public class TenantService {
         if (r.active() != null) t.setActive(r.active());
         if (r.frequency() != null) t.setFrequency(parseFrequency(r.frequency()));
         if (r.dueDay() != null) t.setDueDay(r.dueDay());
+        if (r.tenancyType() != null) t.setTenancyType(parseTenancyType(r.tenancyType()));
+        if (r.maintenanceAmount() != null) t.setMaintenanceAmount(r.maintenanceAmount());
         return tenancies.save(t);
     }
 
@@ -124,5 +128,11 @@ public class TenantService {
         if (s == null || s.isBlank()) return Tenancy.Frequency.MONTHLY;
         try { return Tenancy.Frequency.valueOf(s.toUpperCase()); }
         catch (IllegalArgumentException e) { return Tenancy.Frequency.MONTHLY; }
+    }
+
+    private Tenancy.TenancyType parseTenancyType(String s) {
+        if (s == null || s.isBlank()) return Tenancy.TenancyType.RENTAL;
+        try { return Tenancy.TenancyType.valueOf(s.toUpperCase()); }
+        catch (IllegalArgumentException e) { return Tenancy.TenancyType.RENTAL; }
     }
 }

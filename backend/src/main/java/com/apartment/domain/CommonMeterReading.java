@@ -18,7 +18,12 @@ public class CommonMeterReading {
     private BigDecimal ratePerUnit;
     private BigDecimal billAmount;
     @Builder.Default private Boolean recoverFromTenants = false;
+    @Enumerated(EnumType.STRING)
+    @Builder.Default private SplitMode splitMode = SplitMode.EQUAL;
+    private BigDecimal perFlatShare;
     private Long expenseId;
     private Long createdBy;
     private Instant createdAt = Instant.now();
+
+    public enum SplitMode { EQUAL, MANUAL }
 }

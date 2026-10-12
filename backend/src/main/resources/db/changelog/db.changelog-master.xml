@@ -31,5 +31,10 @@
     <include file="db/changelog/changes/016-common-meter-readings.xml" relativeToChangelogFile="false"/>
     <include file="db/changelog/changes/017-expenses-source.xml" relativeToChangelogFile="false"/>
     <include file="db/changelog/changes/018-water-readings.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/019-meters.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/020-tenancy-type-maintenance.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/021-meter-readings-meter-id.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/022-common-meter-maintenance-split.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/023-flat-nominal-charges.xml" relativeToChangelogFile="false"/>
 
 </databaseChangeLog>

@@ -121,6 +121,13 @@ public class OwnerController {
         return rentSvc.bulkCollect(requireApartmentId(), r);
     }
 
+    /** Owner-facing maintenance coverage: maintenance collected vs common-area outgo. */
+    @GetMapping("/rent/maintenance-coverage")
+    public Map<String, Object> maintenanceCoverage(@RequestParam Integer year,
+                                                   @RequestParam String month) {
+        return rentSvc.maintenanceCoverage(requireApartmentId(), year, month);
+    }
+
     /* ─────────── Electricity ─────────── */
     @PostMapping("/meter")
     public MeterReading upsertMeter(@Valid @RequestBody MeterReadingRequest r) {

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.29.xsd">
+
+    <!--
+      021 - Link readings to the meter master.
+      Adds meter_id to meter_readings and water_readings so a reading knows
+      which meter (and therefore PUBLIC/PRIVATE scope) it belongs to.
+      Nullable for backward compatibility with existing rows.
+    -->
+    <changeSet id="021-meter-readings-meter-id" author="apartment-saas">
+        <addColumn tableName="meter_readings">
+            <column name="meter_id" type="BIGINT"/>
+        </addColumn>
+        <addColumn tableName="water_readings">
+            <column name="meter_id" type="BIGINT"/>
+        </addColumn>
+    </changeSet>
+
+</databaseChangeLog>

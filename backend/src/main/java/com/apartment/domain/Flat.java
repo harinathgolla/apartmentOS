@@ -16,4 +16,6 @@ public class Flat {
     private String ownerName;
     private String ownerPhone;
     private BigDecimal ownerSharePct;
+    private BigDecimal nominalElectricityAmount;
+    private BigDecimal nominalWaterAmount;
 }

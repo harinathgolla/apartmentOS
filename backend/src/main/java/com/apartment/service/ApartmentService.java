@@ -88,6 +88,8 @@ public class ApartmentService {
                 .ownerPhone(r.ownerPhone())
                 .areaSqft(r.areaSqft())
                 .bedrooms(r.bedrooms())
+                .nominalElectricityAmount(r.nominalElectricityAmount())
+                .nominalWaterAmount(r.nominalWaterAmount())
                 .build());
     }
 

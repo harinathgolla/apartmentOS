@@ -43,12 +43,20 @@ type MeterReading = {
   usageUnits?: number; ratePerUnit?: number; billAmount?: number;
 };
 
+type MeterCfg = {
+  id: number; flatId?: number | null;
+  utilityType: "ELECTRICITY" | "WATER";
+  scope: "PUBLIC" | "PRIVATE";
+};
+
 type Row = {
   tenancy: Tenancy;
   flat?: Flat;
   existing?: RentRecord;
   meterBill?: number;
   meterUnits?: number;
+  elecPublic?: boolean;
+  waterPublic?: boolean;
 };
 
 const num = (v: unknown) => {
@@ -83,11 +91,12 @@ export default function RentPage() {
     if (!selectedAptId) { setRows([]); return; }
     setLoading(true);
     try {
-      const [tenants, flats, rent, meter] = await Promise.all([
+      const [tenants, flats, rent, meter, meterCfg] = await Promise.all([
         api.get<Tenancy[]>("/api/owner/tenants", { params: { apartmentId: selectedAptId } }),
         api.get<Flat[]>("/api/owner/flats", { params: { apartmentId: selectedAptId } }),
         api.get<RentRecord[]>("/api/owner/rent", { params: { year, month, apartmentId: selectedAptId } }),
         api.get<MeterReading[]>("/api/owner/meter", { params: { year, month } }).catch(() => ({ data: [] })),
+        api.get<MeterCfg[]>("/api/owner/meters", { params: { apartmentId: selectedAptId } }).catch(() => ({ data: [] })),
       ]);
       const ts = Array.isArray(tenants.data) ? tenants.data.filter((t) => t.active) : [];
       const fs = Array.isArray(flats.data) ? flats.data : [];
@@ -97,6 +106,9 @@ export default function RentPage() {
       const flatsById = new Map(fs.map((f) => [f.id, f]));
       const rentByTenancy = new Map(rs.filter((r) => r.tenancyId).map((r) => [r.tenancyId!, r]));
       const meterByFlat = new Map(ms.map((m) => [m.flatId, m]));
+      const cfg = Array.isArray(meterCfg.data) ? meterCfg.data : [];
+      const pubKey = new Set(cfg.filter((m) => m.scope === "PUBLIC" && m.flatId)
+        .map((m) => `${m.flatId}:${m.utilityType}`));
 
       const computed: Row[] = ts.map((t) => {
         const f = flatsById.get(t.flatId);
@@ -108,6 +120,8 @@ export default function RentPage() {
           existing,
           meterBill: mr?.billAmount != null ? Number(mr.billAmount) : undefined,
           meterUnits: mr?.usageUnits != null ? Number(mr.usageUnits) : undefined,
+          elecPublic: pubKey.has(`${t.flatId}:ELECTRICITY`),
+          waterPublic: pubKey.has(`${t.flatId}:WATER`),
         };
       });
       setRows(computed);
@@ -122,11 +136,18 @@ export default function RentPage() {
 
   /* Suggested per-flat maintenance share (from recover-via-maintenance utility bills) */
   const [maintSuggestion, setMaintSuggestion] = useState(0);
+  const [coverage, setCoverage] = useState<{
+    expected?: number; collected?: number; commonAreaCost?: number;
+    maintenanceExpenses?: number; outgo?: number; surplus?: number; covered?: boolean;
+  } | null>(null);
   useEffect(() => {
     if (!selectedAptId) { setMaintSuggestion(0); return; }
     api.get("/api/owner/utility-bills/maintenance-suggestion", { params: { year, month } })
       .then((r) => setMaintSuggestion(Number(r.data?.perFlat) || 0))
       .catch(() => setMaintSuggestion(0));
+    api.get("/api/owner/rent/maintenance-coverage", { params: { year, month } })
+      .then((r) => setCoverage(r.data ?? null))
+      .catch(() => setCoverage(null));
   }, [selectedAptId, year, month]);
 
   /* Totals */
@@ -211,6 +232,44 @@ export default function RentPage() {
         <KpiCard label="Pending" value={fmtINR(pending)} icon={Clock} tone={pending > 0 ? "warning" : "success"} />
         <KpiCard label="Active tenants" value={String(rows.length)} icon={Home} tone="default" />
       </div>
+
+      {/* Maintenance coverage (owner only) */}
+      {coverage && (
+        <Card className="mb-4">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Wallet className="h-4 w-4" /> Maintenance coverage — {month} {year}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+              <div>
+                <div className="text-xs text-muted-foreground">Expected</div>
+                <div className="text-base font-semibold">{fmtINR(coverage.expected ?? 0)}</div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground">Collected</div>
+                <div className="text-base font-semibold">{fmtINR(coverage.collected ?? 0)}</div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground">Common-area / maintenance outgo</div>
+                <div className="text-base font-semibold">{fmtINR(coverage.outgo ?? 0)}</div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground">{coverage.covered ? "Surplus" : "Shortfall"}</div>
+                <div className={`text-base font-semibold ${coverage.covered ? "text-emerald-600" : "text-destructive"}`}>
+                  {fmtINR(Math.abs(coverage.surplus ?? 0))}
+                </div>
+              </div>
+            </div>
+            <p className="mt-3 text-xs text-muted-foreground">
+              {coverage.covered
+                ? "Maintenance collected covers this period's common-area and maintenance outgo."
+                : "Maintenance collected does not fully cover this period's common-area and maintenance outgo."}
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Rent table */}
       <Card>
@@ -378,8 +437,8 @@ function CollectModal({
   }, [onClose]);
 
   const rent = num(form.rentAmount);
-  const ebill = num(form.ebillAmount);
-  const water = num(form.waterBill);
+  const ebill = row.elecPublic ? 0 : num(form.ebillAmount);
+  const water = row.waterPublic ? 0 : num(form.waterBill);
   const maint = num(form.maintenanceCharge);
   const total = rent + ebill + water + maint;
 
@@ -391,8 +450,8 @@ function CollectModal({
         month,
         year,
         rentAmount: rent,
-        ebillAmount: ebill,
-        waterBill: water,
+        ebillAmount: row.elecPublic ? 0 : ebill,
+        waterBill: row.waterPublic ? 0 : water,
         maintenanceCharge: maint,
         paymentMode: form.paymentMode,
         paidDate: form.paidDate || null,
@@ -438,18 +497,31 @@ function CollectModal({
           <div>
             <Label>
               Electricity (₹)
-              {row.meterUnits != null && row.existing?.ebillAmount == null && (
+              {row.elecPublic ? (
+                <span className="ml-1 text-xs text-sky-600 font-normal">
+                  public meter — tenant pays directly
+                </span>
+              ) : row.meterUnits != null && row.existing?.ebillAmount == null && (
                 <span className="ml-1 text-xs text-muted-foreground font-normal">
                   from meter · {row.meterUnits} units
                 </span>
               )}
             </Label>
-            <Input type="number" value={form.ebillAmount}
+            <Input type="number" value={row.elecPublic ? "0" : form.ebillAmount}
+              disabled={row.elecPublic}
               onChange={(e) => setForm({ ...form, ebillAmount: e.target.value })} />
           </div>
           <div>
-            <Label>Water (₹)</Label>
-            <Input type="number" value={form.waterBill}
+            <Label>
+              Water (₹)
+              {row.waterPublic && (
+                <span className="ml-1 text-xs text-sky-600 font-normal">
+                  public meter — tenant pays directly
+                </span>
+              )}
+            </Label>
+            <Input type="number" value={row.waterPublic ? "0" : form.waterBill}
+              disabled={row.waterPublic}
               onChange={(e) => setForm({ ...form, waterBill: e.target.value })} />
           </div>
           <div>

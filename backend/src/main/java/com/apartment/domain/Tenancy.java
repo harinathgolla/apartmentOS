@@ -28,7 +28,13 @@ public class Tenancy {
     private Integer dueDay = 5;
     @Builder.Default
     private Boolean active = true;
+    @Enumerated(EnumType.STRING)
+    @Builder.Default
+    private TenancyType tenancyType = TenancyType.RENTAL;
+    @Builder.Default
+    private BigDecimal maintenanceAmount = BigDecimal.ZERO;
     private Instant createdAt = Instant.now();
 
     public enum Frequency { MONTHLY, WEEKLY, DAILY, QUARTERLY, YEARLY }
+    public enum TenancyType { RENTAL, LEASE }
 }

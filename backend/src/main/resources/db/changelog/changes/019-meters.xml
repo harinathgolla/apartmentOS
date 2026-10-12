@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.29.xsd">
+
+    <!--
+      019 - Meter master.
+      One meter per flat per utility (ELECTRICITY | WATER).
+      scope = PUBLIC  -> tenant pays the utility directly (owner does not collect)
+      scope = PRIVATE -> owner bills/collects the utility from the tenant
+    -->
+    <changeSet id="019-create-meters" author="apartment-saas">
+        <createTable tableName="meters">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="apartment_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="flat_id" type="BIGINT"/>
+            <column name="label" type="VARCHAR(80)"/>
+            <column name="serial_no" type="VARCHAR(50)"/>
+            <column name="utility_type" type="VARCHAR(20)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="scope" type="VARCHAR(20)" defaultValue="PRIVATE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="rate_per_unit" type="DECIMAL(8,2)"/>
+            <column name="active" type="BIT" defaultValueBoolean="true"/>
+            <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"/>
+        </createTable>
+
+        <addForeignKeyConstraint baseTableName="meters" baseColumnNames="apartment_id"
+                                 referencedTableName="apartments" referencedColumnNames="id"
+                                 constraintName="fk_meters_apartment" onDelete="CASCADE"/>
+        <addForeignKeyConstraint baseTableName="meters" baseColumnNames="flat_id"
+                                 referencedTableName="flats" referencedColumnNames="id"
+                                 constraintName="fk_meters_flat" onDelete="SET NULL"/>
+
+        <addUniqueConstraint tableName="meters" columnNames="flat_id, utility_type"
+                             constraintName="uk_meters_flat_utility"/>
+        <createIndex tableName="meters" indexName="idx_meters_apt">
+            <column name="apartment_id"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>
