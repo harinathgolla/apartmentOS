@@ -1,13 +1,13 @@
 # Apartment SaaS — Project Analysis
 
 > Auto-generated analysis of `D:\Practice\apartment-saas`
-> Date: 2026-10-11
+> Date: 2026-10-12
 
 ---
 
 ## 1. Overview
 
-**Apartment SaaS** is a multi-tenant property/rental management platform targeting apartment owners and tenants (Indian market — INR billing via Razorpay). It handles rent collection, electricity/meter billing, expense tracking, P&L reporting, automated email reminders, subscription billing, and Excel import.
+**Apartment SaaS** (branded **ApartmentOS**) is a multi-tenant property/rental management platform targeting apartment owners and tenants (Indian market — INR billing via Razorpay). It handles rent collection, electricity/water/meter billing with a meter master, utility bills, common-area meters, expense tracking, P&L/ROI reporting, automated email reminders, subscription billing, and Excel import.
 
 - **Backend:** Spring Boot 4.0.8 · Java 21 · **MySQL 8.4** · Redis · **Liquibase**
 - **Frontend:** Next.js 14.2.15 · React 18 · TypeScript · Tailwind CSS · Radix UI
@@ -175,11 +175,11 @@ com/apartment/
 
 ### Domain Entities (`domain/`)
 
-`Org`, `User`, `Apartment`, `Flat`, `Tenancy`, `MeterReading`, `RentRecord`, `Expense`, `Invoice`, `Payment`, `Reminder`
+`Org`, `User`, `Apartment`, `Flat`, `Tenancy`, `Meter` (meter master), `MeterReading`, `WaterReading`, `CommonMeterReading`, `UtilityBill`, `RentRecord`, `Expense`, `Invoice`, `Payment`, `Reminder`
 
 ### Services (`service/`)
 
-- `ApartmentService`, `TenantService`, `RentService`, `MeterService`, `ExpenseService`
+- `ApartmentService`, `TenantService`, `RentService`, `MeterService`, `CommonMeterService`, `WaterService`, `ExpenseService`, `UtilityBillService`
 - `ReminderService`, `AuthService`
 - `PnlService` (profit & loss reporting)
 - `MailerService` (interface) → `SmtpMailerService`, `GmailApiMailerService`
@@ -187,14 +187,15 @@ com/apartment/
 
 ### Repositories (`repo/`)
 
-`ApartmentRepository`, `ExpenseRepository`, `FlatRepository`, `MeterReadingRepository`, `OrgRepository`, `ReminderRepository`, `RentRecordRepository`, `TenancyRepository`, `UserRepository`
+`ApartmentRepository`, `ExpenseRepository`, `FlatRepository`, `MeterRepository`, `MeterReadingRepository`, `WaterReadingRepository`, `CommonMeterReadingRepository`, `UtilityBillRepository`, `OrgRepository`, `ReminderRepository`, `RentRecordRepository`, `TenancyRepository`, `UserRepository`
 
 ### Controllers (`web/`)
 
 | Controller | Base Path | Responsibility |
 |---|---|---|
 | `AuthController` | `/api/auth` | register, login, me |
-| `OwnerController` | `/api/owner` | apartments, flats, tenants, rent, meter, expenses, summary, trend, reminders |
+| `OwnerController` | `/api/owner` | apartments, flats, tenants, rent, meter, water, utilities, expenses, summary, trend, reminders |
+| `MeterController` | `/api/owner/meters` | meter master CRUD (list/create/update/delete) |
 | `TenantController` | `/api/tenant` | me, my rent, my meter |
 | `ImportController` | — | Excel import |
 | `PnlController` | — | P&L reporting |
@@ -220,7 +221,7 @@ com/apartment/
 
 ## 7. Database Schema (Liquibase XML Changelogs)
 
-Managed by **Liquibase** via `backend/src/main/resources/db/changelog/db.changelog-master.xml`, which includes 13 changesets (`changes/001`–`013`). All changesets are **DB-agnostic XML** (target DB: **MySQL 8.4**). Tracking tables: `DATABASECHANGELOG`, `DATABASECHANGELOGLOCK`.
+Managed by **Liquibase** via `backend/src/main/resources/db/changelog/db.changelog-master.xml`, which now includes **23 changesets** (`changes/001`–`023`). All changesets are **DB-agnostic XML** (target DB: **MySQL 8.4**). Tracking tables: `DATABASECHANGELOG`, `DATABASECHANGELOGLOCK`.
 
 ### Changelog files (changes/)
 
@@ -239,6 +240,16 @@ Managed by **Liquibase** via `backend/src/main/resources/db/changelog/db.changel
 | `011-reminders.xml` | `reminders` |
 | `012-audit-log.xml` | `audit_log` |
 | `013-indexes.xml` | 6 indexes (rent, meter, expenses, invoices, users, rent_paid) |
+| `014-meter-readings-paid.xml` | `meter_readings.paid` (BIT) + `paid_date` (DATE) |
+| `015-utility-bills.xml` | `utility_bills` table |
+| `016-common-meter-readings.xml` | `common_meter_readings` table (common-area meters) |
+| `017-expenses-source.xml` | `expenses.source`, `expenses.source_ref_id` (traceability) |
+| `018-water-readings.xml` | `water_readings` table |
+| `019-meters.xml` | `meters` meter master (per-flat per-utility; `scope` PUBLIC/PRIVATE; FKs, unique flat+utility, idx) |
+| `020-tenancy-type-maintenance.xml` | `tenancies.tenancy_type` (RENTAL/LEASE) + `maintenance_amount` |
+| `021-meter-readings-meter-id.xml` | `meter_readings.meter_id`, `water_readings.meter_id` (nullable) |
+| `022-common-meter-maintenance-split.xml` | `common_meter_readings.split_mode` (EQUAL/MANUAL) + `per_flat_share` |
+| `023-flat-nominal-charges.xml` | `flats.nominal_electricity_amount`, `flats.nominal_water_amount` (for flats without meters) |
 
 ### Core tables (created by Liquibase)
 
@@ -256,6 +267,10 @@ Managed by **Liquibase** via `backend/src/main/resources/db/changelog/db.changel
 | `payments` | invoice_id, amount, mode, reference |
 | `reminders` | apartment_id, tenancy_id, recipient_email, subject, body, status, sent_at |
 | `audit_log` | org_id, user_id, entity, action, before_json/after_json (TEXT/CLOB) |
+| `utility_bills` | apartment_id, utility type, period, amount, `source`/`source_ref_id` (recover-via-maintenance) |
+| `common_meter_readings` | apartment_id, label, year+month, previous/present, bill_amount, recover_from_tenants, `split_mode` (EQUAL/MANUAL), `per_flat_share` |
+| `water_readings` | flat_id, `meter_id`, year+month, previous/present, usage_units, rate, bill, paid (BIT) |
+| `meters` | apartment_id, flat_id, label, serial_no, utility_type (ELECTRICITY/WATER), scope (PUBLIC/PRIVATE), rate_per_unit, active (BIT) |
 
 Indexes: `idx_rent_apt_ym`, `idx_meter_apt_ym`, `idx_exp_apt_date`, `idx_inv_apt_status`, `idx_users_org`, `idx_rent_paid`.
 
@@ -274,8 +289,8 @@ app/
 ├── pricing/page.tsx
 ├── owner/
 │   ├── layout.tsx, page.tsx (dashboard)
-│   ├── electricity/  expenses/  import/
-│   ├── pnl/  reminders/  rent/  tenants/
+│   ├── electricity/  expenses/  import/  meters/
+│   ├── pnl/  reminders/  rent/  tenants/  utilities/
 └── tenant/page.tsx
 components/
 ├── charts/      pnl-chart.tsx, revenue-chart.tsx
@@ -297,7 +312,7 @@ lib/
 
 ### Main feature pages (owner)
 
-Dashboard, Electricity (meter), Expenses, Import (Excel), P&L, Reminders, Rent, Tenants — plus pricing and tenant portal.
+Dashboard, Electricity (meter), **Meters** (meter master), **Utilities** (utility bills), Expenses, Import (Excel), P&L, Reminders, Rent (with public-meter handling + maintenance-coverage card), Tenants (with tenancy type + maintenance + nominal charges) — plus pricing and tenant portal.
 
 ---
 
@@ -314,8 +329,20 @@ Dashboard, Electricity (meter), Expenses, Import (Excel), P&L, Reminders, Rent, 
 - `POST /api/owner/rent/bulk-collect` — mark set/all active tenancies paid
 - `GET /api/owner/rent?year&month` — monthly view
 
-### Electricity / Meter
-- `POST /api/owner/meter` upsert; `GET` by year+month; usage & bill computed from readings × rate
+### Electricity / Meter / Water
+- `POST /api/owner/meter` upsert electricity reading; `GET` by year+month; usage & bill computed from readings × rate
+- `POST /api/owner/water` — water readings (with `meter_id`); `POST /api/owner/common-meter` — common-area meter readings
+- **Meter master** (`/api/owner/meters`): one meter per flat per utility, with `scope` PUBLIC/PRIVATE
+  - **PUBLIC** = tenant pays the utility directly → owner does **not** collect it in rent (skipped/zeroed in the collect UI)
+  - **PRIVATE** = owner bills/collects it
+  - No meter mapped → treated as PRIVATE
+- **Nominal charges:** flats without an electricity/water meter can carry a fixed monthly amount (`flats.nominal_electricity_amount`, `nominal_water_amount`) applied at rent collection
+
+### Utility Bills & Maintenance
+- `POST /api/owner/utility-bills` — track bills; `GET /api/owner/utility-bills/maintenance-suggestion` suggests per-flat maintenance share
+- Common-area meter readings support `split_mode` EQUAL (auto-divide across active flats) or MANUAL (`per_flat_share`)
+- `GET /api/owner/rent/maintenance-coverage` — owner-only view: expected maintenance vs collected vs common-area/maintenance outgo, with surplus/shortfall
+- Rent collection auto-fills maintenance from the tenancy's `maintenance_amount`
 
 ### Expense Tracking
 - Categories, subcategories, vendor, receipt URL; scoped to apartment
@@ -349,6 +376,8 @@ Dashboard, Electricity (meter), Expenses, Import (Excel), P&L, Reminders, Rent, 
 6. **`.env` file present** in `containers/` (git-ignored per `.gitignore`).
 7. **CORS:** `SecurityConfig` calls `.cors(c -> {})` enabling defaults; actual allowed origins are in `CorsConfig`.
 8. **Changelog checksum discipline:** do not edit an already-applied changeset; add a new changeset instead, or checksum validation will fail on next startup.
+9. **Meter scope is the billing switch:** a flat's electricity/water meter `scope` (PUBLIC vs PRIVATE) decides whether the owner collects that utility. Unmapped flats default to PRIVATE; flats with no meter fall back to nominal fixed charges. Public-meter line items are disabled/zeroed in the rent collect modal.
+10. **Backend native crash observed (host run):** `mvn spring-boot:run` on the host crashed once with `exit code -1073741819` (Windows ACCESS_VIOLATION, `0xC0000005`) *after* the app had started and served requests. Not a schema/Spring error. To diagnose, re-run with `-XX:ErrorFile` to capture `hs_err_pid*.log`. Note: run via `mvn`/jar rather than the Docker `backend` service to reproduce.
 
 ---
 
@@ -393,4 +422,6 @@ Apartment SaaS is a well-structured, modern multi-tenant rental management platf
 - **Frontend:** Next.js App Router with Radix/Tailwind UI, dedicated owner and tenant portals, charts, and a token-based Axios client.
 - **Infra:** profile-driven Docker Compose supporting three run modes (infra / full / prod) with a local dev stack (**MySQL 8.4**, Redis, MailHog, mock OAuth) and Nginx for production.
 
-The DB layer is now **MySQL 8.4** with **Liquibase** as the sole migration tool (13 DB-agnostic XML changesets). The earlier Postgres/Flyway setup was fully removed and the full stack was verified running (backend healthy, all 14 tables created by Liquibase).
+The DB layer is now **MySQL 8.4** with **Liquibase** as the sole migration tool (**23 DB-agnostic XML changesets**, `001`–`023`). The earlier Postgres/Flyway setup was fully removed.
+
+Latest feature increment (commit `8679d18`): a **meter master** with PUBLIC/PRIVATE utility scope, **tenancy type + maintenance amount**, **nominal fixed charges** for unmetered flats, and an owner-only **maintenance-coverage** view. Changesets `019`–`023` were verified applied against MySQL 8.4 (DB at 23 changesets), Hibernate `ddl-auto: validate` passed, the backend booted and served (`/actuator` 200, secured `/api/owner/meters` 302), and both backend (`mvn package`) and frontend (`next build`, 19 routes incl. `/owner/meters`) build clean.
