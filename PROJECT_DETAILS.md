@@ -1,8 +1,9 @@
 # Apartment SaaS — Project Details & Latest Implementation
 
 > Comprehensive technical analysis of `D:\Practice\apartment-saas`
-> Updated: 2026-10-12 · reflects the latest utilities / rent / water features
-> Commit: `af757d1` — feat: utilities, utility bills, water readings, meter paid status + rent water/maintenance
+> Updated: 2026-10-12 · reflects the latest meters / utility-scope / tenancy / maintenance features
+> Commit: `fb3291f` — docs: update PROJECT_ANALYSIS.md for meter master, utility scope, tenancy/maintenance, nominal charges
+> Feature commit: `8679d18` — feat: meter master, PUBLIC/PRIVATE utility scope, tenancy type + maintenance, nominal flat charges
 
 ---
 
@@ -12,7 +13,9 @@
 
 Owners manage organizations, apartments, flats, tenants (tenancies), rent collection, electricity/water meter readings, utility bills, expenses, P&L/ROI, email reminders, Excel import and subscription plans. Tenants get a read-only portal for rent history and meter readings.
 
-**Recent additions:** meter paid/unpaid status, rent Water+Maintenance line items, a Utility Bills register that auto-creates linked Expenses, owner/common-area electricity readings (also → Expense), per-flat water meter readings, and a maintenance-share suggestion that prefills rent collection.
+**Recent additions:** meter master with PUBLIC/PRIVATE utility scope (tenant-paid vs owner-collected), tenancy type (RENTAL/LEASE) + monthly maintenance amount, nominal fixed electricity/water charges for flats without meters, common-area meter split mode (EQUAL/MANUAL), and an owner-only maintenance-coverage view.
+
+**Earlier additions:** meter paid/unpaid status, rent Water+Maintenance line items, a Utility Bills register that auto-creates linked Expenses, owner/common-area electricity readings (also → Expense), per-flat water meter readings, and a maintenance-share suggestion that prefills rent collection.
 
 ---
 
@@ -46,7 +49,7 @@ apartment-saas/
 │   ├── pom.xml
 │   └── src/main/
 │       ├── java/com/apartment/**
-│       └── resources/db/changelog/     # Liquibase master + 18 changesets
+│       └── resources/db/changelog/     # Liquibase master + 23 changesets
 ├── frontend/                           # Next.js 14 (App Router)
 │   ├── app/** components/** lib/**
 │   └── package.json / tsconfig.json / tailwind.config.ts
@@ -61,20 +64,20 @@ Package root `com.apartment`:
 
 ```
 config/     CorsConfig, SecurityConfig
-domain/     Org, User, Apartment, Flat, Tenancy, MeterReading, WaterReading,
-            CommonMeterReading, UtilityBill, RentRecord, Expense, Invoice,
-            Payment, Reminder
-dto/        AuthDtos (incl. UtilityBillRequest, CommonMeterReadingRequest,
-            WaterReadingRequest, MeterReadingRequest.paid)
+domain/     Org, User, Apartment, Flat, Tenancy, Meter (meter master),
+            MeterReading, WaterReading, CommonMeterReading, UtilityBill,
+            RentRecord, Expense, Invoice, Payment, Reminder
+dto/        AuthDtos (incl. MeterRequest, UtilityBillRequest,
+            CommonMeterReadingRequest, WaterReadingRequest, MeterReadingRequest)
 imports/    ExcelImportService
-repo/       Apartment, User, Org, Flat, Tenancy, MeterReading, WaterReading,
+repo/       Apartment, User, Org, Flat, Tenancy, Meter, MeterReading, WaterReading,
             CommonMeterReading, UtilityBill, RentRecord, Expense, Reminder
 scheduler/  RentReminderScheduler
 security/   AuthDetails, CustomUserDetailsService, JwtAuthFilter, JwtService
 service/    Auth, Apartment, Tenant, Rent, Meter, Water, CommonMeter, UtilityBill,
             Expense, Reminder, Pnl, Mailer (Smtp/Gmail), OAuthTokenPersistence
-web/        Auth, Owner, Tenant, Pnl, Import, UtilityBill, CommonMeter, Water
-            controllers + GlobalExceptionHandler
+web/        Auth, Owner, Meter, Tenant, Pnl, Import, UtilityBill, CommonMeter,
+            Water controllers + GlobalExceptionHandler
 ```
 
 ### Security model
@@ -93,7 +96,7 @@ web/        Auth, Owner, Tenant, Pnl, Import, UtilityBill, CommonMeter, Water
 
 ---
 
-## 5. Database Schema (Liquibase) — 18 changesets
+## 5. Database Schema (Liquibase) — 23 changesets
 
 Master: `backend/src/main/resources/db/changelog/db.changelog-master.xml`
 
@@ -117,6 +120,11 @@ Master: `backend/src/main/resources/db/changelog/db.changelog-master.xml`
 | **016** | **016-common-meter-readings.xml** | `common_meter_readings` | **owner/common electricity; FK apartment; idx_cmeter_apt_ym** |
 | **017** | **017-expenses-source.xml** | alters `expenses` | **adds `source`, `source_ref_id`** |
 | **018** | **018-water-readings.xml** | `water_readings` | **FK flat; unique (flat_id, year, month); paid BIT; idx_water_apt_ym** |
+| **019** | **019-meters.xml** | `meters` | **meter master: per-flat per-utility (ELECTRICITY/WATER); scope PUBLIC/PRIVATE; FK apt (CASCADE) + flat (SET NULL); unique (flat_id, utility_type); idx_meters_apt** |
+| **020** | **020-tenancy-type-maintenance.xml** | alters `tenancies` | **adds `tenancy_type` (RENTAL/LEASE, default RENTAL), `maintenance_amount` DECIMAL(12,2) default 0** |
+| **021** | **021-meter-readings-meter-id.xml** | alters `meter_readings`, `water_readings` | **adds `meter_id` BIGINT (nullable)** |
+| **022** | **022-common-meter-maintenance-split.xml** | alters `common_meter_readings` | **adds `split_mode` (EQUAL/MANUAL, default EQUAL), `per_flat_share` DECIMAL(12,2)** |
+| **023** | **023-flat-nominal-charges.xml** | alters `flats` | **adds `nominal_electricity_amount`, `nominal_water_amount` DECIMAL(12,2)** |
 
 > Booleans use `BIT` → MySQL `BIT(1)` (Hibernate MySQL dialect). Never edit applied changesets.
 
@@ -146,6 +154,10 @@ Master: `backend/src/main/resources/db/changelog/db.changelog-master.xml`
 **Common-area** — `/api/owner/common-meter`: `GET`, `POST` (→ auto Expense `COMMON_METER`), `DELETE /{id}`
 
 **Water** — `/api/owner/water`: `GET ?year&month`, `POST`, `POST /{id}/paid?paid=`
+
+**Meters** — `/api/owner/meters`: `GET ?apartmentId`, `POST ?apartmentId`, `PUT /{id}?apartmentId`, `DELETE /{id}?apartmentId` (meter master CRUD)
+
+**Maintenance coverage** — `GET /api/owner/rent/maintenance-coverage?year&month` → `{ expected, collected, commonAreaCost, maintenanceExpenses, outgo, surplus, covered }`
 
 **Tenant** — `/api/tenant`: `GET /me`, `/rent`, `/meter`
 
@@ -184,6 +196,28 @@ Master: `backend/src/main/resources/db/changelog/db.changelog-master.xml`
 ### 7.7 Utilities dashboard per-tab metrics
 Overview (Electricity/Water/Bills/Meters), Electricity, Water, Utility Bills — each with its own KPIs and tables.
 
+### 7.8 Meter master + PUBLIC/PRIVATE utility scope
+- `meters` table (019) + `Meter` entity/repo + `MeterController` (`/api/owner/meters`). One meter per flat per utility.
+- `scope`: **PUBLIC** = tenant pays the utility directly → owner does **not** collect it in rent; **PRIVATE** = owner bills/collects. No meter mapped → treated as PRIVATE.
+- `RentService.isPublic(flatId, type)` skips/zeroes PUBLIC-meter electricity/water in collection; the rent collect modal disables those fields.
+- Readings carry `meter_id` (021) on both `meter_readings` and `water_readings`.
+- UI: new `/owner/meters` page + sidebar entry.
+
+### 7.9 Tenancy type + maintenance amount
+- `tenancies.tenancy_type` (RENTAL ~11-month | LEASE fixed-term) + `maintenance_amount` (020).
+- `TenantService` persists both on create/update; rent collection auto-fills maintenance from the tenancy when the field is empty.
+- UI: tenant form gets a tenancy-type dropdown + maintenance amount; tenants table shows them.
+
+### 7.10 Nominal charges for unmetered flats
+- `flats.nominal_electricity_amount` / `nominal_water_amount` (023).
+- `RentService.nominalFor(flatId, type)` returns the fixed amount when a flat has **no** meter mapped for that utility; applied at collection when no reading-driven figure is supplied.
+- UI: flat form gets nominal electricity/water fields.
+
+### 7.11 Common-meter split mode + maintenance coverage
+- `common_meter_readings.split_mode` (EQUAL auto-divides across active flats | MANUAL uses owner `per_flat_share`) + `per_flat_share` (022).
+- `RentService.maintenanceCoverage(aptId, year, month)`: expected maintenance vs collected vs common-area/maintenance outgo, with surplus/shortfall; owner-only.
+- UI: rent page shows a **Maintenance coverage** card (Expected / Collected / Outgo / Surplus-Shortfall).
+
 ---
 
 ## 8. Frontend Routes
@@ -194,6 +228,7 @@ Overview (Electricity/Water/Bills/Meters), Electricity, Water, Utility Bills —
 | `/owner` | Dashboard | `/owner/tenants` | Tenants+flats |
 | `/owner/rent` | Rent collection | `/owner/utilities` | Utilities (4 tabs) |
 | `/owner/electricity` | Electricity | `/owner/expenses` | Expenses |
+| `/owner/meters` | Meter master | `/owner/utilities` | Utilities (tabs incl. Meters) |
 | `/owner/pnl` | P&L/ROI | `/owner/import` | Excel |
 | `/owner/reminders` | Reminders | `/owner/profile`, `/owner/settings` |
 | `/tenant` | Tenant portal |
@@ -218,4 +253,6 @@ cd backend && mvn spring-boot:run    # http://localhost:8080
 cd frontend && npm run dev            # http://localhost:3001 (API 8080 via .env.local)
 ```
 
-Liquibase applies all 18 changesets on backend start.
+Liquibase applies all 23 changesets on backend start.
+
+> **Known issue:** a host `mvn spring-boot:run` session crashed once with `exit code -1073741819` (Windows `ACCESS_VIOLATION`, `0xC0000005`) *after* the app had started and served requests — not a schema/Spring error. Re-run with `-XX:ErrorFile` to capture `hs_err_pid*.log` for diagnosis.
