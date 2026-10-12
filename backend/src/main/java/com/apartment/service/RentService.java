@@ -4,7 +4,6 @@ import com.apartment.domain.RentRecord;
 import com.apartment.domain.Tenancy;
 import com.apartment.dto.AuthDtos.BulkCollectRequest;
 import com.apartment.dto.AuthDtos.CollectRentRequest;
-import com.apartment.dto.AuthDtos.RentRecordRequest;
 import com.apartment.repo.RentRecordRepository;
 import com.apartment.repo.TenancyRepository;
 import lombok.RequiredArgsConstructor;
@@ -22,27 +21,6 @@ public class RentService {
     private final RentRecordRepository repo;
     private final TenancyRepository tenancies;
 
-    public RentRecord upsert(Long aptId, RentRecordRequest r) {
-        RentRecord rec = repo.findByTenancyIdAndYearAndMonth(r.tenancyId(), r.year(), r.month())
-                .orElseGet(() -> RentRecord.builder()
-                        .tenancyId(r.tenancyId()).flatId(r.flatId())
-                        .apartmentId(aptId).month(r.month()).year(r.year()).build());
-
-        var t = tenancies.findById(r.tenancyId()).orElseThrow();
-        rec.setTenantName(t.getTenantName());
-        rec.setRentAmount(nz(r.rentAmount()));
-        rec.setEbillAmount(nz(r.ebillAmount()));
-        rec.setHouseMaid(nz(r.houseMaid()));
-        rec.setGarbageVehicle(nz(r.garbageVehicle()));
-        rec.setGeneratorDiesel(nz(r.generatorDiesel()));
-        rec.setSharedEbill(nz(r.sharedEbill()));
-        rec.setEmiInterest(nz(r.emiInterest()));
-        rec.setReturnsAmount(nz(r.returnsAmount()));
-        rec.setRemarks(r.remarks());
-        rec.setPaid(Boolean.TRUE.equals(r.paid()));
-        recalc(rec);
-        return repo.save(rec);
-    }
 
     /** Records a rent payment — creates or updates the record and marks it paid. */
     @Transactional
@@ -65,11 +43,6 @@ public class RentService {
         if (r.ebillAmount() != null) rec.setEbillAmount(r.ebillAmount());
         if (r.waterBill() != null) rec.setWaterBill(r.waterBill());
         if (r.maintenanceCharge() != null) rec.setMaintenanceCharge(r.maintenanceCharge());
-        if (r.houseMaid() != null) rec.setHouseMaid(r.houseMaid());
-        if (r.garbageVehicle() != null) rec.setGarbageVehicle(r.garbageVehicle());
-        if (r.generatorDiesel() != null) rec.setGeneratorDiesel(r.generatorDiesel());
-        if (r.sharedEbill() != null) rec.setSharedEbill(r.sharedEbill());
-        if (r.emiInterest() != null) rec.setEmiInterest(r.emiInterest());
         rec.setPaid(true);
         rec.setPaidDate(r.paidDate() != null ? r.paidDate() : LocalDate.now());
         rec.setPaymentMode(parseMode(r.paymentMode()));
@@ -128,16 +101,14 @@ public class RentService {
 
     /* ─── helpers ─── */
     private void recalc(RentRecord rec) {
-        BigDecimal collected = nz(rec.getRentAmount()).add(nz(rec.getEbillAmount()));
+        // Tenant-side charges only — these are what the tenant pays to the owner.
+        BigDecimal collected = nz(rec.getRentAmount())
+                .add(nz(rec.getEbillAmount()))
+                .add(nz(rec.getWaterBill()))
+                .add(nz(rec.getMaintenanceCharge()));
         rec.setTotalCollected(collected);
-        BigDecimal net = collected
-                .subtract(nz(rec.getHouseMaid()))
-                .subtract(nz(rec.getGarbageVehicle()))
-                .subtract(nz(rec.getGeneratorDiesel()))
-                .subtract(nz(rec.getSharedEbill()))
-                .subtract(nz(rec.getEmiInterest()));
-        rec.setNetIncome(net);
-        rec.setCumulativeTotal(net);
+        rec.setNetIncome(collected);
+        rec.setCumulativeTotal(collected);
     }
 
     private BigDecimal nz(BigDecimal b) { return b == null ? BigDecimal.ZERO : b; }

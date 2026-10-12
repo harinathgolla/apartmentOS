@@ -18,4 +18,6 @@ public class MeterReading {
     private BigDecimal ratePerUnit;
     private BigDecimal billAmount;
     private LocalDate readingDate;
+    @Builder.Default private Boolean paid = false;
+    private LocalDate paidDate;
 }

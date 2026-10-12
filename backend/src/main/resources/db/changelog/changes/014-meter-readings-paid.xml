@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.29.xsd">
+
+    <!-- Phase 2: paid/unpaid status for electricity meter readings.
+         BIT is used (not BOOLEAN) so MySQL maps it to BIT(1), matching the
+         Hibernate MySQL dialect for a Java Boolean under ddl-auto=validate. -->
+    <changeSet id="014-meter-readings-paid" author="apartment-saas">
+        <addColumn tableName="meter_readings">
+            <column name="paid" type="BIT" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="paid_date" type="DATE"/>
+        </addColumn>
+    </changeSet>
+
+</databaseChangeLog>

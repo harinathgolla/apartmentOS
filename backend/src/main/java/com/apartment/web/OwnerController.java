@@ -102,11 +102,6 @@ public class OwnerController {
     public Tenancy reactivateTenant(@PathVariable Long id) { return tenantSvc.reactivate(id, orgId()); }
 
     /* ─────────── Rent ─────────── */
-    @PostMapping("/rent")
-    public RentRecord upsertRent(@Valid @RequestBody RentRecordRequest r) {
-        return rentSvc.upsert(requireApartmentId(), r);
-    }
-
     @GetMapping("/rent")
     public List<RentRecord> rentByMonth(@RequestParam Integer year, @RequestParam String month,
                                         @RequestParam(required = false) Long apartmentId) {
@@ -135,6 +130,12 @@ public class OwnerController {
     public List<MeterReading> meterByMonth(@RequestParam Integer year, @RequestParam String month) {
         Long aptId = primaryApartmentIdOrNull();
         return aptId == null ? List.of() : meterSvc.byMonth(aptId, year, month);
+    }
+
+    /** Toggle the paid/unpaid status of a meter reading. */
+    @PostMapping("/meter/{id}/paid")
+    public MeterReading markMeterPaid(@PathVariable Long id, @RequestParam boolean paid) {
+        return meterSvc.markPaid(requireApartmentId(), id, paid);
     }
 
     /* ─────────── Expenses ─────────── */

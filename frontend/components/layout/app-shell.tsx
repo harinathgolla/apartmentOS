@@ -13,7 +13,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="hidden md:block">
           <Topbar />
         </div>
-        <main className="flex-1 p-3 sm:p-4 md:p-6 lg:p-8 pt-16 md:pt-6">{children}</main>
+        <main className="flex-1 p-3 sm:p-4 md:p-6 lg:p-8 pt-16">{children}</main>
       </div>
     </div>
   );

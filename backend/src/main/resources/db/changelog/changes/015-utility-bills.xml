@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.29.xsd">
+
+    <!-- Phase 3: utility bills (generator fuel, lift/building maintenance, taxes,
+         plumbing/electrical/repair works, etc). Each bill auto-creates an Expense row. -->
+    <changeSet id="015-create-utility-bills" author="apartment-saas">
+        <createTable tableName="utility_bills">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="apartment_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="category" type="VARCHAR(40)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="subcategory" type="VARCHAR(80)"/>
+            <column name="description" type="VARCHAR(500)"/>
+            <column name="amount" type="DECIMAL(12,2)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="bill_date" type="DATE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="vendor" type="VARCHAR(255)"/>
+            <column name="invoice_no" type="VARCHAR(80)"/>
+            <column name="period_month" type="VARCHAR(12)"/>
+            <column name="period_year" type="INT"/>
+            <column name="affects_maintenance" type="BIT" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="expense_id" type="BIGINT"/>
+            <column name="created_by" type="BIGINT"/>
+            <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"/>
+        </createTable>
+        <addForeignKeyConstraint baseTableName="utility_bills" baseColumnNames="apartment_id"
+                                 referencedTableName="apartments" referencedColumnNames="id"
+                                 constraintName="fk_ubill_apartment" onDelete="CASCADE"/>
+        <createIndex tableName="utility_bills" indexName="idx_ubill_apt_date">
+            <column name="apartment_id"/>
+            <column name="bill_date"/>
+        </createIndex>
+        <createIndex tableName="utility_bills" indexName="idx_ubill_apt_cat">
+            <column name="apartment_id"/>
+            <column name="category"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

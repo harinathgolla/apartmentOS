@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Building2, LayoutDashboard, Receipt, Zap, Wallet,
+  Building2, LayoutDashboard, Receipt, Wallet, Droplets,
   Users, LineChart, Settings, Bell, FileSpreadsheet,
   Menu, X,
 } from "lucide-react";
@@ -13,7 +13,7 @@ const items = [
   { href: "/owner",             label: "Dashboard",   icon: LayoutDashboard },
   { href: "/owner/tenants",     label: "Tenants",     icon: Users },
   { href: "/owner/rent",        label: "Rent",        icon: Receipt },
-  { href: "/owner/electricity", label: "Electricity", icon: Zap },
+  { href: "/owner/utilities",   label: "Utilities",   icon: Droplets },
   { href: "/owner/expenses",    label: "Expenses",    icon: Wallet },
   { href: "/owner/pnl",         label: "P&L / ROI",   icon: LineChart },
   { href: "/owner/import",      label: "Import",      icon: FileSpreadsheet },

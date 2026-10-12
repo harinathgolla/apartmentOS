@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import {
   Moon, Sun, Bell, Search, LogOut, User as UserIcon,
   ChevronDown, Settings,
@@ -28,7 +29,7 @@ export function Topbar() {
     .split(" ").map((s: string) => s[0]).slice(0, 2).join("").toUpperCase();
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center gap-2 md:gap-4 border-b bg-background/70 backdrop-blur-xl px-3 md:px-6">
+    <header className="sticky top-0 z-40 flex h-16 items-center gap-2 md:gap-4 border-b bg-background px-3 md:px-6">
       <div className="flex-1" />
 
       <div className="relative hidden lg:block">
@@ -80,14 +81,14 @@ export function Topbar() {
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuItem asChild>
-            <a href="/owner/profile" className="cursor-pointer">
+            <Link href="/owner/profile" className="flex w-full items-center gap-2">
               <UserIcon className="h-4 w-4" /> Profile
-            </a>
+            </Link>
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
-            <a href="/owner/settings" className="cursor-pointer">
+            <Link href="/owner/settings" className="flex w-full items-center gap-2">
               <Settings className="h-4 w-4" /> Settings
-            </a>
+            </Link>
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem

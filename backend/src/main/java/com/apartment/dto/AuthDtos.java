@@ -33,25 +33,31 @@ public class AuthDtos {
     public record CollectRentRequest(@NotNull Long tenancyId, @NotBlank String month, @NotNull Integer year,
                                      BigDecimal rentAmount, BigDecimal ebillAmount,
                                      BigDecimal waterBill, BigDecimal maintenanceCharge,
-                                     BigDecimal houseMaid, BigDecimal garbageVehicle,
-                                     BigDecimal generatorDiesel, BigDecimal sharedEbill,
-                                     BigDecimal emiInterest, String paymentMode,
+                                     String paymentMode,
                                      LocalDate paidDate, String remarks) {}
 
     public record BulkCollectRequest(@NotBlank String month, @NotNull Integer year,
                                      String paymentMode, List<Long> tenancyIds) {}
 
-    public record RentRecordRequest(Long tenancyId, Long flatId, String month, Integer year,
-                                    BigDecimal rentAmount, BigDecimal ebillAmount,
-                                    BigDecimal houseMaid, BigDecimal garbageVehicle,
-                                    BigDecimal generatorDiesel, BigDecimal sharedEbill,
-                                    BigDecimal emiInterest, BigDecimal returnsAmount,
-                                    String remarks, Boolean paid) {}
     public record MeterReadingRequest(@NotNull Long flatId, @NotNull Integer year, @NotBlank String month,
                                       BigDecimal previousReading, BigDecimal presentReading,
-                                      BigDecimal ratePerUnit) {}
+                                      BigDecimal ratePerUnit, Boolean paid) {}
     public record ReminderRequest(String month, Integer year, String customMessage, Boolean sendToAll) {}
     public record ExpenseRequest(Long apartmentId, @NotBlank String category, String subcategory,
                                  @NotNull BigDecimal amount, @NotNull LocalDate expenseDate,
                                  String vendor, String invoiceNo, String notes) {}
+
+    public record UtilityBillRequest(@NotBlank String category, String subcategory, String description,
+                                     @NotNull BigDecimal amount, @NotNull LocalDate billDate,
+                                     String vendor, String invoiceNo,
+                                     String periodMonth, Integer periodYear,
+                                     Boolean affectsMaintenance) {}
+
+    public record CommonMeterReadingRequest(String label, @NotNull Integer year, @NotBlank String month,
+                                            BigDecimal previousReading, BigDecimal presentReading,
+                                            BigDecimal ratePerUnit, Boolean recoverFromTenants) {}
+
+    public record WaterReadingRequest(@NotNull Long flatId, @NotNull Integer year, @NotBlank String month,
+                                      BigDecimal previousReading, BigDecimal presentReading,
+                                      BigDecimal ratePerUnit, Boolean paid) {}
 }

@@ -4,7 +4,9 @@ import com.apartment.dto.AuthDtos.MeterReadingRequest;
 import com.apartment.repo.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 
 @Service @RequiredArgsConstructor
@@ -30,6 +32,20 @@ public class MeterService {
         m.setRatePerUnit(rate);
         m.setUsageUnits(usage);
         m.setBillAmount(usage.multiply(rate));
+        if (r.paid() != null) {
+            m.setPaid(r.paid());
+            m.setPaidDate(r.paid() ? LocalDate.now() : null);
+        }
+        return repo.save(m);
+    }
+
+    @Transactional
+    public MeterReading markPaid(Long aptId, Long id, boolean paid) {
+        MeterReading m = repo.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Reading not found"));
+        if (!m.getApartmentId().equals(aptId)) throw new IllegalArgumentException("Not your apartment");
+        m.setPaid(paid);
+        m.setPaidDate(paid ? LocalDate.now() : null);
         return repo.save(m);
     }
 

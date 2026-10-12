@@ -26,22 +26,34 @@ export default function ExpensesPage() {
         <CardContent>
           <Table>
             <TableHeader>
-              <TableRow><TableHead>Date</TableHead><TableHead>Category</TableHead><TableHead>Vendor</TableHead><TableHead>Amount</TableHead></TableRow>
+              <TableRow><TableHead>Date</TableHead><TableHead>Category</TableHead><TableHead>Source</TableHead><TableHead>Vendor</TableHead><TableHead>Amount</TableHead></TableRow>
             </TableHeader>
             <TableBody>
               {rows.length === 0 && (
-                <TableRow><TableCell colSpan={4} className="text-center py-10 text-muted-foreground">
+                <TableRow><TableCell colSpan={5} className="text-center py-10 text-muted-foreground">
                   {loading ? "Loading…" : "No expenses yet"}
                 </TableCell></TableRow>
               )}
-              {rows.map((r) => (
-                <TableRow key={r.id}>
-                  <TableCell>{r.expenseDate}</TableCell>
-                  <TableCell><Badge variant="info">{r.category}</Badge></TableCell>
-                  <TableCell>{r.vendor ?? "—"}</TableCell>
-                  <TableCell className="font-semibold">{fmtINR(r.amount)}</TableCell>
-                </TableRow>
-              ))}
+              {rows.map((r) => {
+                const src = r.source ?? "MANUAL";
+                return (
+                  <TableRow key={r.id}>
+                    <TableCell>{r.expenseDate}</TableCell>
+                    <TableCell><Badge variant="info">{r.category?.replace(/_/g, " ")}</Badge></TableCell>
+                    <TableCell>
+                      {src === "MANUAL" ? (
+                        <span className="text-xs text-muted-foreground">Manual</span>
+                      ) : src === "UTILITY_BILL" ? (
+                        <Badge variant="warning">Utility bill</Badge>
+                      ) : (
+                        <Badge variant="secondary">Common meter</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>{r.vendor ?? "—"}</TableCell>
+                    <TableCell className="font-semibold">{fmtINR(r.amount)}</TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </CardContent>

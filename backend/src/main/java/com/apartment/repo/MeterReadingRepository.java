@@ -6,4 +6,5 @@ public interface MeterReadingRepository extends JpaRepository<MeterReading, Long
     List<MeterReading> findByApartmentIdAndYearAndMonth(Long aptId, Integer year, String month);
     List<MeterReading> findByFlatIdOrderByYearDescIdDesc(Long flatId);
     Optional<MeterReading> findByFlatIdAndYearAndMonth(Long flatId, Integer year, String month);
+    List<MeterReading> findByApartmentIdAndYearAndMonthAndPaid(Long aptId, Integer year, String month, Boolean paid);
 }

@@ -35,8 +35,7 @@ type RentRecord = {
   id?: number; tenancyId?: number; flatId: number; apartmentId: number;
   tenantName: string; month: string; year: number;
   rentAmount?: number; ebillAmount?: number; waterBill?: number; maintenanceCharge?: number;
-  houseMaid?: number; garbageVehicle?: number; generatorDiesel?: number; sharedEbill?: number;
-  emiInterest?: number; totalCollected?: number; netIncome?: number;
+  totalCollected?: number;
   paymentMode?: string; paid?: boolean; paidDate?: string; remarks?: string;
 };
 type MeterReading = {
@@ -121,11 +120,25 @@ export default function RentPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  /* Suggested per-flat maintenance share (from recover-via-maintenance utility bills) */
+  const [maintSuggestion, setMaintSuggestion] = useState(0);
+  useEffect(() => {
+    if (!selectedAptId) { setMaintSuggestion(0); return; }
+    api.get("/api/owner/utility-bills/maintenance-suggestion", { params: { year, month } })
+      .then((r) => setMaintSuggestion(Number(r.data?.perFlat) || 0))
+      .catch(() => setMaintSuggestion(0));
+  }, [selectedAptId, year, month]);
+
   /* Totals */
   const expected = rows.reduce((s, r) => s + num(r.tenancy.rentAmount), 0);
   const collected = rows.reduce((s, r) => s + (r.existing?.paid ? num(r.existing.totalCollected) : 0), 0);
   const pending = rows.reduce(
-    (s, r) => s + (r.existing?.paid ? 0 : num(r.tenancy.rentAmount) + num(r.meterBill)),
+    (s, r) => s + (r.existing?.paid
+      ? 0
+      : num(r.existing?.totalCollected) ||
+        (num(r.tenancy.rentAmount) + num(r.existing?.waterBill) +
+         num(r.existing?.maintenanceCharge) +
+         (r.existing?.ebillAmount != null ? num(r.existing.ebillAmount) : num(r.meterBill)))),
     0
   );
 
@@ -211,6 +224,8 @@ export default function RentPage() {
                 <TableHead>Tenant</TableHead>
                 <TableHead>Flat</TableHead>
                 <TableHead>Rent</TableHead>
+                <TableHead>Water</TableHead>
+                <TableHead>Maint.</TableHead>
                 <TableHead>EBill</TableHead>
                 <TableHead>Total</TableHead>
                 <TableHead>Status</TableHead>
@@ -220,7 +235,7 @@ export default function RentPage() {
             <TableBody>
               {rows.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-10 text-muted-foreground">
+                  <TableCell colSpan={9} className="text-center py-10 text-muted-foreground">
                     {loading ? "Loading…"
                       : !selectedAptId ? "Select an apartment"
                       : "No active tenants in this apartment"}
@@ -231,7 +246,9 @@ export default function RentPage() {
                 const ebill = row.existing?.ebillAmount != null
                   ? num(row.existing.ebillAmount)
                   : num(row.meterBill);
-                const total = num(row.tenancy.rentAmount) + ebill;
+                const water = num(row.existing?.waterBill);
+                const maint = num(row.existing?.maintenanceCharge);
+                const total = num(row.tenancy.rentAmount) + water + maint + ebill;
                 const isPaid = row.existing?.paid === true;
                 return (
                   <TableRow key={row.tenancy.id} className={isPaid ? "" : ""}>
@@ -245,6 +262,8 @@ export default function RentPage() {
                       ) : `#${row.tenancy.flatId}`}
                     </TableCell>
                     <TableCell>{fmtINR(row.tenancy.rentAmount)}</TableCell>
+                    <TableCell>{water ? fmtINR(water) : "—"}</TableCell>
+                    <TableCell>{maint ? fmtINR(maint) : "—"}</TableCell>
                     <TableCell>
                       {fmtINR(ebill)}
                       {row.meterUnits != null && row.existing?.ebillAmount == null && (
@@ -302,6 +321,7 @@ export default function RentPage() {
           row={collectFor}
           month={month}
           year={year}
+          maintSuggestion={maintSuggestion}
           onClose={() => setCollectFor(null)}
           onDone={() => { setCollectFor(null); load(); }}
         />
@@ -326,8 +346,8 @@ export default function RentPage() {
    Collect modal — per-tenant
    ═══════════════════════════════════════════════════════════════════ */
 function CollectModal({
-  row, month, year, onClose, onDone,
-}: { row: Row; month: string; year: number; onClose: () => void; onDone: () => void }) {
+  row, month, year, maintSuggestion, onClose, onDone,
+}: { row: Row; month: string; year: number; maintSuggestion?: number; onClose: () => void; onDone: () => void }) {
   const [form, setForm] = useState({
     rentAmount: row.existing?.rentAmount != null
       ? String(row.existing.rentAmount)
@@ -336,10 +356,9 @@ function CollectModal({
       ? String(row.existing.ebillAmount)
       : (row.meterBill != null ? String(row.meterBill) : ""),
     waterBill: row.existing?.waterBill != null ? String(row.existing.waterBill) : "",
-    maintenanceCharge: row.existing?.maintenanceCharge != null ? String(row.existing.maintenanceCharge) : "",
-    houseMaid: row.existing?.houseMaid != null ? String(row.existing.houseMaid) : "",
-    generatorDiesel: row.existing?.generatorDiesel != null ? String(row.existing.generatorDiesel) : "",
-    sharedEbill: row.existing?.sharedEbill != null ? String(row.existing.sharedEbill) : "",
+    maintenanceCharge: row.existing?.maintenanceCharge != null
+      ? String(row.existing.maintenanceCharge)
+      : (maintSuggestion && maintSuggestion > 0 ? String(maintSuggestion) : ""),
     paymentMode: row.existing?.paymentMode ?? "CASH",
     paidDate: row.existing?.paidDate ?? new Date().toISOString().slice(0, 10),
     remarks: row.existing?.remarks ?? "",
@@ -375,9 +394,6 @@ function CollectModal({
         ebillAmount: ebill,
         waterBill: water,
         maintenanceCharge: maint,
-        houseMaid: form.houseMaid ? Number(form.houseMaid) : null,
-        generatorDiesel: form.generatorDiesel ? Number(form.generatorDiesel) : null,
-        sharedEbill: form.sharedEbill ? Number(form.sharedEbill) : null,
         paymentMode: form.paymentMode,
         paidDate: form.paidDate || null,
         remarks: form.remarks || null,
@@ -437,30 +453,16 @@ function CollectModal({
               onChange={(e) => setForm({ ...form, waterBill: e.target.value })} />
           </div>
           <div>
-            <Label>Maintenance (₹)</Label>
+            <Label>
+              Maintenance (₹)
+              {row.existing?.maintenanceCharge == null && maintSuggestion && maintSuggestion > 0 && (
+                <span className="ml-1 text-xs text-muted-foreground font-normal">
+                  suggested from utility bills
+                </span>
+              )}
+            </Label>
             <Input type="number" value={form.maintenanceCharge}
               onChange={(e) => setForm({ ...form, maintenanceCharge: e.target.value })} />
-          </div>
-
-          <div className="md:col-span-2 pt-2">
-            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-              Deductions (optional)
-            </div>
-          </div>
-          <div>
-            <Label>House maid (₹)</Label>
-            <Input type="number" value={form.houseMaid}
-              onChange={(e) => setForm({ ...form, houseMaid: e.target.value })} />
-          </div>
-          <div>
-            <Label>Generator diesel (₹)</Label>
-            <Input type="number" value={form.generatorDiesel}
-              onChange={(e) => setForm({ ...form, generatorDiesel: e.target.value })} />
-          </div>
-          <div className="md:col-span-2">
-            <Label>Shared EBill (₹)</Label>
-            <Input type="number" value={form.sharedEbill}
-              onChange={(e) => setForm({ ...form, sharedEbill: e.target.value })} />
           </div>
 
           <div>

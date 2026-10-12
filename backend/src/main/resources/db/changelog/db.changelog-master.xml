@@ -26,5 +26,10 @@
     <include file="db/changelog/changes/011-reminders.xml" relativeToChangelogFile="false"/>
     <include file="db/changelog/changes/012-audit-log.xml" relativeToChangelogFile="false"/>
     <include file="db/changelog/changes/013-indexes.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/014-meter-readings-paid.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/015-utility-bills.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/016-common-meter-readings.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/017-expenses-source.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/018-water-readings.xml" relativeToChangelogFile="false"/>
 
 </databaseChangeLog>

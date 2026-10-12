@@ -19,5 +19,7 @@ public class Expense {
     @Column(columnDefinition="TEXT") private String notes;
     private String receiptUrl;
     private Long createdBy;
+    @Builder.Default private String source = "MANUAL";
+    private Long sourceRefId;
     private Instant createdAt = Instant.now();
 }
