@@ -175,12 +175,14 @@ com/apartment/
 
 ### Domain Entities (`domain/`)
 
-`Org`, `User`, `Apartment`, `Flat`, `Tenancy`, `Meter` (meter master), `MeterReading`, `WaterReading`, `CommonMeterReading`, `UtilityBill`, `RentRecord`, `Expense`, `Invoice`, `Payment`, `Reminder`, `LiabilitySettlement` (refundable-liability ledger)
+`Org`, `User`, `Apartment`, `Flat`, `Tenancy`, `Meter` (meter master), `MeterReading`, `WaterReading`, `CommonMeterReading`, `UtilityBill`, `RentRecord`, `Expense`, `Invoice`, `Payment`, `Reminder`, `LiabilitySettlement` (refundable-liability ledger), `AuditLog` (append-only activity trail — maps the `audit_log` table from changeset 012; `before_json`/`after_json` are `@Lob`)
 
 ### Services (`service/`)
 
 - `ApartmentService`, `TenantService`, `RentService`, `MeterService`, `CommonMeterService`, `WaterService`, `ExpenseService`, `UtilityBillService`
 - `LiabilityService` — security-deposit / lease-advance outstanding balances, settlement (partial refunds with reason), history
+- `AuditService` — records every mutating owner action (`REQUIRES_NEW` so the row survives a caller rollback); JSON snapshots built reflectively because **Jackson is not a project dependency** (only `jjwt-jackson` and Gson are present)
+- `DeletionService` — hard-cascade deletion with a two-step contract: first call without `cascade` throws when dependents exist (→ 409); `cascade=true` deletes child-first in one transaction and audits the result
 - `ReminderService`, `AuthService`
 - `PnlService` (profit & loss reporting)
 - `MailerService` (interface) → `SmtpMailerService`, `GmailApiMailerService`
@@ -188,7 +190,9 @@ com/apartment/
 
 ### Repositories (`repo/`)
 
-`ApartmentRepository`, `ExpenseRepository`, `FlatRepository`, `LiabilitySettlementRepository`, `MeterRepository`, `MeterReadingRepository`, `WaterReadingRepository`, `CommonMeterReadingRepository`, `UtilityBillRepository`, `OrgRepository`, `ReminderRepository`, `RentRecordRepository`, `TenancyRepository`, `UserRepository`
+`ApartmentRepository`, `AuditLogRepository`, `ExpenseRepository`, `FlatRepository`, `LiabilitySettlementRepository`, `MeterRepository`, `MeterReadingRepository`, `WaterReadingRepository`, `CommonMeterReadingRepository`, `UtilityBillRepository`, `OrgRepository`, `ReminderRepository`, `RentRecordRepository`, `TenancyRepository`, `UserRepository`
+
+> Note: there is **no** `InvoiceRepository` or `PaymentRepository` — the `invoices`/`payments` tables exist from Liquibase but have no Java mapping, so invoice/payment records are not covered by cascade deletion.
 
 ### Controllers (`web/`)
 
@@ -198,6 +202,7 @@ com/apartment/
 | `OwnerController` | `/api/owner` | apartments, flats, tenants, rent, meter, water, utilities, expenses, summary, trend, reminders |
 | `MeterController` | `/api/owner/meters` | meter master CRUD (list/create/update/delete) |
 | `LiabilityController` | `/api/owner/liabilities` | outstanding refundable liabilities, settle (partial refund + reason), settlement history |
+| `AuditController` | `/api/owner/audit` | paginated activity trail (`entity`, `page`, `size`), scoped to the caller's org |
 | `TenantController` | `/api/tenant` | me, my rent, my meter |
 | `ImportController` | — | Excel import |
 | `PnlController` | — | P&L reporting |
@@ -312,13 +317,22 @@ lib/
 ### API Client (`lib/api.ts`)
 
 - Axios base URL from `NEXT_PUBLIC_API_URL` (fallback `http://localhost:8080`)
-- **Request interceptor:** attaches `Authorization: Bearer <token>` from `localStorage`
-- **Response interceptor:** on 401 → clears storage and redirects to `/login`
+- **Request interceptor:** attaches `Authorization: Bearer <token>` from `localStorage`; also calls `trackStart()` on the global-loader counter
+- **Response interceptors:** call `trackEnd()`; on 401 → clears storage and redirects to `/login`
+- Pass `silent: true` in a request config to skip the global loading indicator (useful for background polls)
 - `Me` type: `{ id, email, fullName, role, orgId, apartmentId, googleConnected }`
+
+### Shared UI infrastructure
+
+| Component | Purpose |
+|---|---|
+| `components/ui/global-loader.tsx` | Pending-request pub/sub (`trackStart`/`trackEnd`); renders a top progress bar + "Working…" pill while any non-silent request is in flight |
+| `components/ui/confirm-dialog.tsx` | `ConfirmProvider` + `useConfirm()` / `useAlert()` returning `Promise<boolean>`. Tones danger/warning/info/success, optional bulleted `details` panel, Esc/Enter, scroll lock, `aria-modal`. **Replaces all `window.confirm`/`window.alert`** |
+| `components/ui/delete-button.tsx` | Two-step hard-cascade delete: `DELETE` without cascade → on 409 fetch the impact endpoint and show a confirm listing each dependent count → re-issue with `?cascade=true` |
 
 ### Main feature pages (owner)
 
-Dashboard, Electricity (meter), **Meters** (meter master), **Utilities** (utility bills), Expenses, Import (Excel), P&L, Reminders, Rent (with public-meter handling + maintenance-coverage card), Tenants (with tenancy type + maintenance + nominal charges), **Liabilities** (`/owner/liabilities` — refundable deposits & lease advances with settle modal + history), **Past tenants** (`/owner/tenants/past` — vacated-tenancy audit with deductions and reactivate) — plus pricing and tenant portal.
+Dashboard, Electricity (meter), **Meters** (meter master), **Utilities** (utility bills), Expenses, Import (Excel), P&L, Reminders, **Audit log** (`/owner/audit` — paginated activity trail with entity filter), Rent (with public-meter handling + maintenance-coverage card), Tenants (with tenancy type + maintenance + nominal charges), **Liabilities** (`/owner/liabilities` — refundable deposits & lease advances with settle modal + history), **Past tenants** (`/owner/tenants/past` — vacated-tenancy audit with deductions and reactivate) — plus pricing and tenant portal.
 
 ---
 
@@ -350,6 +364,25 @@ Collecting also **syncs the reading's paid status** (`syncReadingPaid`) so the M
 - `POST /api/owner/liabilities/tenancy/{id}/settle` — record a partial refund (`kind`, `amount`, `settledDate`, `notes`, `reason`)
 - `GET /api/owner/liabilities/tenancy/{id}/history` — settlement ledger
 - **Neither security deposits nor lease advances are rent income** — they are refundable liabilities held by the owner and are never added to rent totals
+
+### Audit trail & cascade deletion
+
+**Audit** (mutations only): `AuditService.record(ctx, entity, entityId, action, before, after)` writes to `audit_log` capturing `user_id` and `org_id` from `AuthDetails`. Runs in `REQUIRES_NEW` so the row persists even when the business transaction rolls back, and swallows serialization errors so auditing can never break the primary operation. Actions recorded: `Tenancy` CREATE / UPDATE / VACATE / DELETE_CASCADE, `RentRecord` COLLECT / DELETE, `Apartment` DELETE_CASCADE, `Flat` DELETE_CASCADE, `UtilityBill` DELETE, `LiabilitySettlement` SETTLE. Viewed at `GET /api/owner/audit` → `/owner/audit`.
+
+**Cascade deletion** (`DeletionService`) — child-first order:
+`liability_settlements → rent_records → meter_readings → water_readings → meters → common_meter_readings → utility_bills → expenses → reminders → tenancies → flats → apartment`
+
+Two-step contract: first `DELETE` without `cascade` → if dependents exist, `IllegalStateException` listing counts → **HTTP 409**; re-issue with `?cascade=true` → single transaction delete + audit row. Impact previews at `GET .../delete-impact`.
+
+| Endpoint | Notes |
+|---|---|
+| `DELETE /api/owner/apartments/{id}?cascade=` | full apartment teardown |
+| `GET /api/owner/apartments/{id}/delete-impact` | dependent counts |
+| `DELETE /api/owner/apartments/{aptId}/flats/{flatId}?cascade=` | flat teardown |
+| `GET /api/owner/apartments/{aptId}/flats/{flatId}/delete-impact` | dependent counts |
+| `DELETE /api/owner/tenants/{id}?cascade=` | tenancy + rent records + settlements |
+| `DELETE /api/owner/rent/{id}` | single rent record |
+| `DELETE /api/owner/utility-bills/{id}` | pre-existing endpoint, now audited |
 
 ### Tenancy lifecycle
 - **Onboarding:** RENTAL with a start date and no explicit end auto-sets **start + 11 months** (server-side and in the form); LEASE keeps the owner-entered period
@@ -405,7 +438,11 @@ Collecting also **syncs the reading's paid status** (`syncReadingPaid`) so the M
 7. **CORS:** `SecurityConfig` calls `.cors(c -> {})` enabling defaults; actual allowed origins are in `CorsConfig`.
 8. **Changelog checksum discipline:** do not edit an already-applied changeset; add a new changeset instead, or checksum validation will fail on next startup.
 9. **Meter scope is the billing switch:** a flat's electricity/water meter `scope` (PUBLIC vs PRIVATE) decides whether the owner collects that utility. Unmapped flats default to PRIVATE; flats with no meter fall back to nominal fixed charges. Public-meter line items are disabled/zeroed in the rent collect modal.
-10. **Backend native crash observed (host run):** `mvn spring-boot:run` on the host crashed once with `exit code -1073741819` (Windows ACCESS_VIOLATION, `0xC0000005`) *after* the app had started and served requests. Not a schema/Spring error. To diagnose, re-run with `-XX:ErrorFile` to capture `hs_err_pid*.log`. Note: run via `mvn`/jar rather than the Docker `backend` service to reproduce.
+10. **No Jackson dependency:** `com.fasterxml.jackson.databind.ObjectMapper` is **not** on the classpath (only `jjwt-jackson`, a JWT shim, and `google-http-client-gson`). `AuditService` therefore builds audit snapshots with a small reflective map serializer. If rich JSON is needed later, add an explicit `jackson-databind` dependency rather than assuming it is transitive.
+11. **`audit_log` CLOB mapping unverified on live DB:** `AuditLog` maps `before_json`/`after_json` as `@Lob` against Liquibase `CLOB` columns. Not yet confirmed by a real boot + `ddl-auto: validate`.
+12. **Invoice/payment cascade gap:** `invoices` and `payments` tables exist from Liquibase but have **no** entity/repository, so they are absent from cascade deletion and audit.
+13. **Changesets 024–026 unapplied:** `024-lease-upfront-charge`, `025-liability-settlements`, `026-tenancy-audit-and-deductions` exist in the changelog but have not been run against the live DB. Next boot applies them; `ddl-auto: validate` fails loudly if any is skipped.
+14. **Backend native crash observed (host run):** `mvn spring-boot:run` on the host crashed once with `exit code -1073741819` (Windows ACCESS_VIOLATION, `0xC0000005`) *after* the app had started and served requests. Not a schema/Spring error. To diagnose, re-run with `-XX:ErrorFile` to capture `hs_err_pid*.log`. Note: run via `mvn`/jar rather than the Docker `backend` service to reproduce.
 
 ---
 
