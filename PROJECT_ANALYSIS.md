@@ -175,11 +175,12 @@ com/apartment/
 
 ### Domain Entities (`domain/`)
 
-`Org`, `User`, `Apartment`, `Flat`, `Tenancy`, `Meter` (meter master), `MeterReading`, `WaterReading`, `CommonMeterReading`, `UtilityBill`, `RentRecord`, `Expense`, `Invoice`, `Payment`, `Reminder`
+`Org`, `User`, `Apartment`, `Flat`, `Tenancy`, `Meter` (meter master), `MeterReading`, `WaterReading`, `CommonMeterReading`, `UtilityBill`, `RentRecord`, `Expense`, `Invoice`, `Payment`, `Reminder`, `LiabilitySettlement` (refundable-liability ledger)
 
 ### Services (`service/`)
 
 - `ApartmentService`, `TenantService`, `RentService`, `MeterService`, `CommonMeterService`, `WaterService`, `ExpenseService`, `UtilityBillService`
+- `LiabilityService` — security-deposit / lease-advance outstanding balances, settlement (partial refunds with reason), history
 - `ReminderService`, `AuthService`
 - `PnlService` (profit & loss reporting)
 - `MailerService` (interface) → `SmtpMailerService`, `GmailApiMailerService`
@@ -187,7 +188,7 @@ com/apartment/
 
 ### Repositories (`repo/`)
 
-`ApartmentRepository`, `ExpenseRepository`, `FlatRepository`, `MeterRepository`, `MeterReadingRepository`, `WaterReadingRepository`, `CommonMeterReadingRepository`, `UtilityBillRepository`, `OrgRepository`, `ReminderRepository`, `RentRecordRepository`, `TenancyRepository`, `UserRepository`
+`ApartmentRepository`, `ExpenseRepository`, `FlatRepository`, `LiabilitySettlementRepository`, `MeterRepository`, `MeterReadingRepository`, `WaterReadingRepository`, `CommonMeterReadingRepository`, `UtilityBillRepository`, `OrgRepository`, `ReminderRepository`, `RentRecordRepository`, `TenancyRepository`, `UserRepository`
 
 ### Controllers (`web/`)
 
@@ -196,6 +197,7 @@ com/apartment/
 | `AuthController` | `/api/auth` | register, login, me |
 | `OwnerController` | `/api/owner` | apartments, flats, tenants, rent, meter, water, utilities, expenses, summary, trend, reminders |
 | `MeterController` | `/api/owner/meters` | meter master CRUD (list/create/update/delete) |
+| `LiabilityController` | `/api/owner/liabilities` | outstanding refundable liabilities, settle (partial refund + reason), settlement history |
 | `TenantController` | `/api/tenant` | me, my rent, my meter |
 | `ImportController` | — | Excel import |
 | `PnlController` | — | P&L reporting |
@@ -221,7 +223,7 @@ com/apartment/
 
 ## 7. Database Schema (Liquibase XML Changelogs)
 
-Managed by **Liquibase** via `backend/src/main/resources/db/changelog/db.changelog-master.xml`, which now includes **23 changesets** (`changes/001`–`023`). All changesets are **DB-agnostic XML** (target DB: **MySQL 8.4**). Tracking tables: `DATABASECHANGELOG`, `DATABASECHANGELOGLOCK`.
+Managed by **Liquibase** via `backend/src/main/resources/db/changelog/db.changelog-master.xml`, which now includes **26 changesets** (`changes/001`–`026`). All changesets are **DB-agnostic XML** (target DB: **MySQL 8.4**). Tracking tables: `DATABASECHANGELOG`, `DATABASECHANGELOGLOCK`.
 
 ### Changelog files (changes/)
 
@@ -250,6 +252,9 @@ Managed by **Liquibase** via `backend/src/main/resources/db/changelog/db.changel
 | `021-meter-readings-meter-id.xml` | `meter_readings.meter_id`, `water_readings.meter_id` (nullable) |
 | `022-common-meter-maintenance-split.xml` | `common_meter_readings.split_mode` (EQUAL/MANUAL) + `per_flat_share` |
 | `023-flat-nominal-charges.xml` | `flats.nominal_electricity_amount`, `flats.nominal_water_amount` (for flats without meters) |
+| `024-lease-upfront-charge.xml` | `tenancies.lease_upfront_amount` / `lease_upfront_collected` / `lease_upfront_notes` — one-time lease advance, a refundable liability (never rent income) |
+| `025-liability-settlements.xml` | `liability_settlements` ledger (SECURITY_DEPOSIT / LEASE_UPFRONT refunds; FK tenancy, idx apartment) |
+| `026-tenancy-audit-and-deductions.xml` | `tenancies.deduction_amount` / `deduction_reason` / `vacate_date` / `deducted_at`; `liability_settlements.reason` |
 
 ### Core tables (created by Liquibase)
 
@@ -259,7 +264,8 @@ Managed by **Liquibase** via `backend/src/main/resources/db/changelog/db.changel
 | `users` | org_id, email (unique), password_hash, role, google_refresh_token, google_connected (BIT) |
 | `apartments` | org_id, address, purchase_value/date, loan_amount/emi/interest_rate |
 | `flats` | apartment_id, flat_no (unique per apt), area_sqft, meter_serial_no, owner_share_pct |
-| `tenancies` | flat_id, tenant_user_id, rent_amount, security_deposit, due_day, frequency, active (BIT) |
+| `tenancies` | flat_id, tenant_user_id, rent_amount, security_deposit, deposit_refunded, due_day, frequency, active (BIT), tenancy_type (RENTAL/LEASE), maintenance_amount, lease_upfront_amount/collected/notes, deduction_amount/reason, vacate_date, deducted_at |
+| `liability_settlements` | tenancy_id, apartment_id, kind (SECURITY_DEPOSIT/LEASE_UPFRONT), amount, settled_date, notes, reason |
 | `meter_readings` | flat_id, year+month (unique), previous/present reading, usage_units, rate, bill |
 | `rent_records` | tenancy_id, month+year (unique), rent/ebill/water/maintenance, many expense fields, net_income, cumulative_total, payment_mode, paid (BIT) |
 | `expenses` | apartment_id, category, amount, expense_date, vendor, receipt_url |
@@ -312,7 +318,7 @@ lib/
 
 ### Main feature pages (owner)
 
-Dashboard, Electricity (meter), **Meters** (meter master), **Utilities** (utility bills), Expenses, Import (Excel), P&L, Reminders, Rent (with public-meter handling + maintenance-coverage card), Tenants (with tenancy type + maintenance + nominal charges) — plus pricing and tenant portal.
+Dashboard, Electricity (meter), **Meters** (meter master), **Utilities** (utility bills), Expenses, Import (Excel), P&L, Reminders, Rent (with public-meter handling + maintenance-coverage card), Tenants (with tenancy type + maintenance + nominal charges), **Liabilities** (`/owner/liabilities` — refundable deposits & lease advances with settle modal + history), **Past tenants** (`/owner/tenants/past` — vacated-tenancy audit with deductions and reactivate) — plus pricing and tenant portal.
 
 ---
 
@@ -329,6 +335,28 @@ Dashboard, Electricity (meter), **Meters** (meter master), **Utilities** (utilit
 - `POST /api/owner/rent/bulk-collect` — mark set/all active tenancies paid
 - `GET /api/owner/rent?year&month` — monthly view
 
+**Charge precedence in `RentService.collect()`** (and mirrored in bulk-collect):
+1. **Nominal** flat charge (`flats.nominal_*_amount`) wins outright — meter readings are ignored
+2. **PUBLIC** scope meter → amount zeroed (tenant pays the utility directly)
+3. Explicit amount passed in the request
+4. Otherwise the **recorded meter/water reading bill for that exact month** is pulled in
+
+Collecting also **syncs the reading's paid status** (`syncReadingPaid`) so the Meters/Electricity screens reflect collection. Maintenance is forced from `tenancy.maintenance_amount` and cannot drift.
+
+**Historical rent:** the rent page requests `/api/owner/tenants?all=true` and keeps a row when the tenancy is active **or** has a rent record for the selected month — so an old/vacated agreement surfaces with *its own* rent for historical months.
+
+### Liabilities (deposits & lease advances)
+- `GET /api/owner/liabilities?apartmentId` — per-tenancy `depositOutstanding`, `leaseUpfrontOutstanding`, `totalOutstanding` plus apartment totals
+- `POST /api/owner/liabilities/tenancy/{id}/settle` — record a partial refund (`kind`, `amount`, `settledDate`, `notes`, `reason`)
+- `GET /api/owner/liabilities/tenancy/{id}/history` — settlement ledger
+- **Neither security deposits nor lease advances are rent income** — they are refundable liabilities held by the owner and are never added to rent totals
+
+### Tenancy lifecycle
+- **Onboarding:** RENTAL with a start date and no explicit end auto-sets **start + 11 months** (server-side and in the form); LEASE keeps the owner-entered period
+- **Vacate:** `POST /api/owner/tenants/{id}/vacate` sets inactive, records `vacate_date`, and stores `deduction_amount` / `deduction_reason` / `deducted_at` as permanent audit (e.g. painting = 1 month rent, damages, cleaning). `deactivate` delegates to this path
+- **Reactivation:** `POST /api/owner/tenants/{id}/reactivate` — blocked if another tenant is already active on that flat
+- **Past-tenants audit page** lists vacated tenancies with `deposit − deduction = refundable` and a one-click Reactivate
+
 ### Electricity / Meter / Water
 - `POST /api/owner/meter` upsert electricity reading; `GET` by year+month; usage & bill computed from readings × rate
 - `POST /api/owner/water` — water readings (with `meter_id`); `POST /api/owner/common-meter` — common-area meter readings
@@ -336,7 +364,7 @@ Dashboard, Electricity (meter), **Meters** (meter master), **Utilities** (utilit
   - **PUBLIC** = tenant pays the utility directly → owner does **not** collect it in rent (skipped/zeroed in the collect UI)
   - **PRIVATE** = owner bills/collects it
   - No meter mapped → treated as PRIVATE
-- **Nominal charges:** flats without an electricity/water meter can carry a fixed monthly amount (`flats.nominal_electricity_amount`, `nominal_water_amount`) applied at rent collection
+- **Nominal charges:** flats without an electricity/water meter can carry a fixed monthly amount (`flats.nominal_electricity_amount`, `nominal_water_amount`) applied at rent collection. When set, meter/reading charges are hidden or locked in the tenant and rent UIs, and the nominal amount can be edited from tenant onboarding (written back to the flat). Flat add/edit shows the meters assigned on the Meters page and disables the nominal field when a meter exists
 
 ### Utility Bills & Maintenance
 - `POST /api/owner/utility-bills` — track bills; `GET /api/owner/utility-bills/maintenance-suggestion` suggests per-flat maintenance share

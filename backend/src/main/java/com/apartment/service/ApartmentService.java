@@ -96,4 +96,23 @@ public class ApartmentService {
     public List<Flat> flats(Long aptId) {
         return flats.findByApartmentId(aptId);
     }
+
+    /** Update an existing flat — used by the flat edit modal and nominal write-back. */
+    @Transactional
+    public Flat updateFlat(Long aptId, Long flatId, FlatRequest r) {
+        Flat f = flats.findById(flatId)
+                .orElseThrow(() -> new IllegalArgumentException("Flat not found"));
+        if (!f.getApartmentId().equals(aptId))
+            throw new IllegalArgumentException("Flat not in this apartment");
+        if (r.flatNo() != null && !r.flatNo().isBlank()) f.setFlatNo(r.flatNo());
+        f.setFloor(r.floor());
+        f.setMeterSerialNo(r.meterSerialNo());
+        f.setOwnerName(r.ownerName());
+        f.setOwnerPhone(r.ownerPhone());
+        f.setAreaSqft(r.areaSqft());
+        f.setBedrooms(r.bedrooms());
+        f.setNominalElectricityAmount(r.nominalElectricityAmount());
+        f.setNominalWaterAmount(r.nominalWaterAmount());
+        return flats.save(f);
+    }
 }

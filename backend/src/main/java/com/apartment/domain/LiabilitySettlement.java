@@ -22,6 +22,8 @@ public class LiabilitySettlement {
     @Builder.Default private BigDecimal amount = BigDecimal.ZERO;
     private LocalDate settledDate;
     private String notes;
+    /** Structured reason for a partial refund: DAMAGES / PAINTING / CLEANING / OTHER. */
+    private String reason;
     private Instant createdAt = Instant.now();
 
     public enum Kind { SECURITY_DEPOSIT, LEASE_UPFRONT }

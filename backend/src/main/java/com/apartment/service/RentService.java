@@ -8,9 +8,11 @@ import com.apartment.dto.AuthDtos.CollectRentRequest;
 import com.apartment.repo.CommonMeterReadingRepository;
 import com.apartment.repo.ExpenseRepository;
 import com.apartment.repo.FlatRepository;
+import com.apartment.repo.MeterReadingRepository;
 import com.apartment.repo.MeterRepository;
 import com.apartment.repo.RentRecordRepository;
 import com.apartment.repo.TenancyRepository;
+import com.apartment.repo.WaterReadingRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,6 +31,8 @@ public class RentService {
     private final CommonMeterReadingRepository commonMeters;
     private final ExpenseRepository expenses;
     private final FlatRepository flats;
+    private final MeterReadingRepository meterReadings;
+    private final WaterReadingRepository waterReadings;
 
     /**
      * PRIVATE-meter utilities are collected by the owner; PUBLIC-meter utilities are paid
@@ -58,6 +62,25 @@ public class RentService {
                 .orElse(null);
     }
 
+    /**
+     * True when the flat is billed by a fixed nominal amount for this utility.
+     * In that case meter readings are irrelevant and must NOT leak into rent collection.
+     */
+    private boolean usesNominal(Long flatId, Meter.UtilityType type) {
+        return nominalFor(flatId, type) != null;
+    }
+
+    /** Bill amount from the recorded meter reading for the period, or null if none. */
+    private BigDecimal readingBill(Long flatId, Integer year, String month, Meter.UtilityType type) {
+        if (flatId == null) return null;
+        if (type == Meter.UtilityType.ELECTRICITY) {
+            return meterReadings.findByFlatIdAndYearAndMonth(flatId, year, month)
+                    .map(r -> r.getBillAmount()).orElse(null);
+        }
+        return waterReadings.findByFlatIdAndYearAndMonth(flatId, year, month)
+                .map(r -> r.getBillAmount()).orElse(null);
+    }
+
     /** Records a rent payment — creates or updates the record and marks it paid. */
     @Transactional
     public RentRecord collect(Long aptId, CollectRentRequest r) {
@@ -76,19 +99,32 @@ public class RentService {
         BigDecimal rent = r.rentAmount() != null ? r.rentAmount() : t.getRentAmount();
         rec.setTenantName(t.getTenantName());
         rec.setRentAmount(nz(rent));
-        // PUBLIC-meter utilities are tenant-paid directly -> never collected by owner
-        if (r.ebillAmount() != null && !isPublic(t.getFlatId(), Meter.UtilityType.ELECTRICITY)) {
+        // Electricity: nominal flat charge wins; otherwise reading bill; otherwise what was passed.
+        if (usesNominal(t.getFlatId(), Meter.UtilityType.ELECTRICITY)) {
+            rec.setEbillAmount(nz(nominalFor(t.getFlatId(), Meter.UtilityType.ELECTRICITY)));
+        } else if (isPublic(t.getFlatId(), Meter.UtilityType.ELECTRICITY)) {
+            rec.setEbillAmount(BigDecimal.ZERO);
+        } else if (r.ebillAmount() != null) {
             rec.setEbillAmount(r.ebillAmount());
-        } else if (r.ebillAmount() == null) {
-            BigDecimal nominalElec = nominalFor(t.getFlatId(), Meter.UtilityType.ELECTRICITY);
-            if (nominalElec != null && nz(rec.getEbillAmount()).signum() == 0) rec.setEbillAmount(nominalElec);
+        } else {
+            BigDecimal fromReading = readingBill(t.getFlatId(), r.year(), r.month(), Meter.UtilityType.ELECTRICITY);
+            if (fromReading != null) rec.setEbillAmount(fromReading);
         }
-        if (r.waterBill() != null && !isPublic(t.getFlatId(), Meter.UtilityType.WATER)) {
+
+        // Water: same precedence.
+        if (usesNominal(t.getFlatId(), Meter.UtilityType.WATER)) {
+            rec.setWaterBill(nz(nominalFor(t.getFlatId(), Meter.UtilityType.WATER)));
+        } else if (isPublic(t.getFlatId(), Meter.UtilityType.WATER)) {
+            rec.setWaterBill(BigDecimal.ZERO);
+        } else if (r.waterBill() != null) {
             rec.setWaterBill(r.waterBill());
-        } else if (r.waterBill() == null) {
-            BigDecimal nominalWater = nominalFor(t.getFlatId(), Meter.UtilityType.WATER);
-            if (nominalWater != null && nz(rec.getWaterBill()).signum() == 0) rec.setWaterBill(nominalWater);
+        } else {
+            BigDecimal fromReading = readingBill(t.getFlatId(), r.year(), r.month(), Meter.UtilityType.WATER);
+            if (fromReading != null) rec.setWaterBill(fromReading);
         }
+
+        // Keep meter reading paid-status in sync with the collection.
+        syncReadingPaid(t.getFlatId(), r.year(), r.month(), rec);
         if (r.maintenanceCharge() != null) rec.setMaintenanceCharge(r.maintenanceCharge());
         else if (t.getMaintenanceAmount() != null
                 && (rec.getMaintenanceCharge() == null || rec.getMaintenanceCharge().signum() == 0))
@@ -127,11 +163,29 @@ public class RentService {
             if (rec.getRentAmount() == null || rec.getRentAmount().signum() == 0) {
                 rec.setRentAmount(nz(t.getRentAmount()));
             }
+            // Maintenance is fixed by the agreement — never let bulk-collect drift from it.
+            if (t.getMaintenanceAmount() != null && t.getMaintenanceAmount().signum() > 0) {
+                rec.setMaintenanceCharge(t.getMaintenanceAmount());
+            }
+            // Utility lines: nominal wins, else the recorded reading bill.
+            if (usesNominal(t.getFlatId(), Meter.UtilityType.ELECTRICITY)) {
+                rec.setEbillAmount(nz(nominalFor(t.getFlatId(), Meter.UtilityType.ELECTRICITY)));
+            } else if (!isPublic(t.getFlatId(), Meter.UtilityType.ELECTRICITY)) {
+                BigDecimal e = readingBill(t.getFlatId(), r.year(), r.month(), Meter.UtilityType.ELECTRICITY);
+                if (e != null) rec.setEbillAmount(e);
+            }
+            if (usesNominal(t.getFlatId(), Meter.UtilityType.WATER)) {
+                rec.setWaterBill(nz(nominalFor(t.getFlatId(), Meter.UtilityType.WATER)));
+            } else if (!isPublic(t.getFlatId(), Meter.UtilityType.WATER)) {
+                BigDecimal w = readingBill(t.getFlatId(), r.year(), r.month(), Meter.UtilityType.WATER);
+                if (w != null) rec.setWaterBill(w);
+            }
             rec.setPaid(true);
             rec.setPaidDate(LocalDate.now());
             rec.setPaymentMode(mode);
             recalc(rec);
             repo.save(rec);
+            syncReadingPaid(t.getFlatId(), r.year(), r.month(), rec);
             collected++;
         }
         return Map.of("collected", collected, "month", r.month(), "year", r.year());
@@ -150,6 +204,32 @@ public class RentService {
     }
 
     /* ─── helpers ─── */
+
+    /**
+     * When rent is collected, mark the matching meter/water reading paid so the
+     * Meters/Electricity screens reflect collection status. Nominal flats have no
+     * reading to sync.
+     */
+    private void syncReadingPaid(Long flatId, Integer year, String month, RentRecord rec) {
+        if (flatId == null) return;
+        boolean paid = Boolean.TRUE.equals(rec.getPaid());
+        LocalDate paidDate = rec.getPaidDate();
+        if (!usesNominal(flatId, Meter.UtilityType.ELECTRICITY)) {
+            meterReadings.findByFlatIdAndYearAndMonth(flatId, year, month).ifPresent(m -> {
+                m.setPaid(paid);
+                m.setPaidDate(paid ? paidDate : null);
+                meterReadings.save(m);
+            });
+        }
+        if (!usesNominal(flatId, Meter.UtilityType.WATER)) {
+            waterReadings.findByFlatIdAndYearAndMonth(flatId, year, month).ifPresent(m -> {
+                m.setPaid(paid);
+                m.setPaidDate(paid ? paidDate : null);
+                waterReadings.save(m);
+            });
+        }
+    }
+
     private void recalc(RentRecord rec) {
         // Tenant-side charges only — these are what the tenant pays to the owner.
         BigDecimal collected = nz(rec.getRentAmount())

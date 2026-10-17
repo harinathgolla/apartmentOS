@@ -63,6 +63,9 @@ type Row = {
   waterPublic?: boolean;
   /** Fixed maintenance for the agreement term, from tenancy. */
   maintFixed?: number;
+  /** Flat bills by nominal amount for this utility — meter is irrelevant. */
+  elecNominal?: number;
+  waterNominal?: number;
 };
 
 const num = (v: unknown) => {
@@ -98,16 +101,22 @@ export default function RentPage() {
     setLoading(true);
     try {
       const [tenants, flats, rent, meter, meterCfg] = await Promise.all([
-        api.get<Tenancy[]>("/api/owner/tenants", { params: { apartmentId: selectedAptId } }),
+        // Include past/old tenancies so historical months show that agreement's rent.
+        api.get<Tenancy[]>("/api/owner/tenants", { params: { apartmentId: selectedAptId, all: true } }),
         api.get<Flat[]>("/api/owner/flats", { params: { apartmentId: selectedAptId } }),
         api.get<RentRecord[]>("/api/owner/rent", { params: { year, month, apartmentId: selectedAptId } }),
         api.get<MeterReading[]>("/api/owner/meter", { params: { year, month } }).catch(() => ({ data: [] })),
         api.get<MeterCfg[]>("/api/owner/meters", { params: { apartmentId: selectedAptId } }).catch(() => ({ data: [] })),
       ]);
-      const ts = Array.isArray(tenants.data) ? tenants.data.filter((t) => t.active) : [];
       const fs = Array.isArray(flats.data) ? flats.data : [];
       const rs = Array.isArray(rent.data) ? rent.data : [];
       const ms = Array.isArray(meter.data) ? meter.data : [];
+      // Keep a tenancy if it is active OR it has a record for the selected period,
+      // so an old agreement still surfaces with its own (historical) rent.
+      const allTenancies = Array.isArray(tenants.data) ? tenants.data : [];
+      const ts = allTenancies.filter(
+        (t) => t.active || rs.some((r) => r.tenancyId === t.id)
+      );
 
       const flatsById = new Map(fs.map((f) => [f.id, f]));
       const rentByTenancy = new Map(rs.filter((r) => r.tenancyId).map((r) => [r.tenancyId!, r]));
@@ -129,6 +138,10 @@ export default function RentPage() {
           elecPublic: pubKey.has(`${t.flatId}:ELECTRICITY`),
           waterPublic: pubKey.has(`${t.flatId}:WATER`),
           maintFixed: t.maintenanceAmount != null ? Number(t.maintenanceAmount) : undefined,
+          elecNominal: f?.nominalElectricityAmount != null && Number(f.nominalElectricityAmount) > 0
+            ? Number(f.nominalElectricityAmount) : undefined,
+          waterNominal: f?.nominalWaterAmount != null && Number(f.nominalWaterAmount) > 0
+            ? Number(f.nominalWaterAmount) : undefined,
         };
       });
       setRows(computed);

@@ -120,6 +120,7 @@ public class LiabilityService {
                 .amount(r.amount())
                 .settledDate(r.settledDate() != null ? r.settledDate() : LocalDate.now())
                 .notes(r.notes())
+                .reason(r.reason())
                 .build();
         settlements.save(s);
 

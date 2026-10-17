@@ -39,6 +39,12 @@ public class Tenancy {
     @Builder.Default
     private BigDecimal leaseUpfrontCollected = BigDecimal.ZERO;
     private String leaseUpfrontNotes;
+    /* Vacate audit — deductions withheld from the deposit, and when the tenant left. */
+    @Builder.Default
+    private BigDecimal deductionAmount = BigDecimal.ZERO;
+    private String deductionReason;
+    private LocalDate vacateDate;
+    private Instant deductedAt;
     private Instant createdAt = Instant.now();
 
     public enum Frequency { MONTHLY, WEEKLY, DAILY, QUARTERLY, YEARLY }

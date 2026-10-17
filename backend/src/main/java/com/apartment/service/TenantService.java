@@ -50,6 +50,15 @@ public class TenantService {
         });
 
         Tenancy.Frequency freq = parseFrequency(r.frequency());
+        Tenancy.TenancyType type = parseTenancyType(r.tenancyType());
+
+        // RENTAL agreements default to an 11-month term from the start date.
+        // LEASE terms are owner-entered (3/5 years etc.) and left as supplied.
+        java.time.LocalDate start = r.startDate();
+        java.time.LocalDate end = r.endDate();
+        if (start != null && end == null && type == Tenancy.TenancyType.RENTAL) {
+            end = start.plusMonths(11);
+        }
 
         Tenancy t = Tenancy.builder()
                 .flatId(r.flatId())
@@ -60,11 +69,11 @@ public class TenantService {
                 .tenantEmail(r.tenantEmail())
                 .rentAmount(r.rentAmount())
                 .securityDeposit(r.securityDeposit())
-                .agreementStart(r.startDate())
-                .agreementEnd(r.endDate())
+                .agreementStart(start)
+                .agreementEnd(end)
                 .frequency(freq)
                 .dueDay(r.dueDay() != null ? r.dueDay() : 5)
-                .tenancyType(parseTenancyType(r.tenancyType()))
+                .tenancyType(type)
                 .maintenanceAmount(r.maintenanceAmount() != null ? r.maintenanceAmount() : java.math.BigDecimal.ZERO)
                 .leaseUpfrontAmount(r.leaseUpfrontAmount() != null ? r.leaseUpfrontAmount() : java.math.BigDecimal.ZERO)
                 .leaseUpfrontCollected(r.leaseUpfrontCollected() != null ? r.leaseUpfrontCollected() : java.math.BigDecimal.ZERO)
@@ -101,22 +110,57 @@ public class TenantService {
         if (r.securityDeposit() != null) t.setSecurityDeposit(r.securityDeposit());
         if (r.startDate() != null) t.setAgreementStart(r.startDate());
         if (r.endDate() != null) t.setAgreementEnd(r.endDate());
+        // RENTAL with a start but no explicit end: default to an 11-month term.
+        if (r.startDate() != null && r.endDate() == null
+                && t.getTenancyType() == Tenancy.TenancyType.RENTAL
+                && t.getAgreementEnd() == null) {
+            t.setAgreementEnd(r.startDate().plusMonths(11));
+        }
         if (r.active() != null) t.setActive(r.active());
         if (r.frequency() != null) t.setFrequency(parseFrequency(r.frequency()));
         if (r.dueDay() != null) t.setDueDay(r.dueDay());
         if (r.tenancyType() != null) t.setTenancyType(parseTenancyType(r.tenancyType()));
         if (r.maintenanceAmount() != null) t.setMaintenanceAmount(r.maintenanceAmount());
+        // Nominal override written back to the flat (item 5).
+        if (r.nominalElectricityAmount() != null || r.nominalWaterAmount() != null) {
+            flats.findById(t.getFlatId()).ifPresent(f -> {
+                if (r.nominalElectricityAmount() != null) f.setNominalElectricityAmount(r.nominalElectricityAmount());
+                if (r.nominalWaterAmount() != null) f.setNominalWaterAmount(r.nominalWaterAmount());
+                flats.save(f);
+            });
+        }
         if (r.leaseUpfrontAmount() != null) t.setLeaseUpfrontAmount(r.leaseUpfrontAmount());
         if (r.leaseUpfrontCollected() != null) t.setLeaseUpfrontCollected(r.leaseUpfrontCollected());
         if (r.leaseUpfrontNotes() != null) t.setLeaseUpfrontNotes(r.leaseUpfrontNotes());
         return tenancies.save(t);
     }
 
+    /**
+     * Vacate a tenancy with an optional deposit deduction (damages/painting/etc.).
+     * The deduction is audit data — it stays on the tenancy forever so a future
+     * reactivation or a returning tenant has full history.
+     */
     @Transactional
-    public Tenancy deactivate(Long id, Long orgId) {
+    public Tenancy vacate(Long id, Long orgId, java.time.LocalDate vacateDate,
+                          java.math.BigDecimal deductionAmount, String deductionReason) {
         Tenancy t = getById(id, orgId);
         t.setActive(false);
+        if (vacateDate != null) t.setVacateDate(vacateDate);
+        else if (t.getVacateDate() == null) t.setVacateDate(java.time.LocalDate.now());
+
+        if (deductionAmount != null && deductionAmount.signum() > 0) {
+            java.math.BigDecimal existing = t.getDeductionAmount() == null
+                    ? java.math.BigDecimal.ZERO : t.getDeductionAmount();
+            t.setDeductionAmount(existing.add(deductionAmount));
+            t.setDeductionReason(deductionReason);
+            t.setDeductedAt(java.time.Instant.now());
+        }
         return tenancies.save(t);
+    }
+
+    @Transactional
+    public Tenancy deactivate(Long id, Long orgId) {
+        return vacate(id, orgId, null, null, null);
     }
 
     @Transactional

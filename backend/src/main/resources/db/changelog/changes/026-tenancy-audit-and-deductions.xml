@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.29.xsd">
+
+    <!--
+      026 - Tenancy audit + deposit-deduction support.
+
+      deduction_amount  -> amount withheld from the deposit at vacate (damages, painting, etc.)
+      deduction_reason  -> free-text reason for the deduction
+      vacate_date       -> date the tenant actually vacated (deactivate)
+      deducted_at       -> when the deduction was recorded
+
+      Also adds a reason column on liability_settlements so partial refunds can carry
+      a structured reason (DAMAGES / PAINTING / CLEANING / OTHER).
+    -->
+    <changeSet id="026-tenancy-audit-and-deductions" author="apartment-saas">
+        <addColumn tableName="tenancies">
+            <column name="deduction_amount" type="DECIMAL(12,2)" defaultValueNumeric="0"/>
+            <column name="deduction_reason" type="VARCHAR(255)"/>
+            <column name="vacate_date" type="DATE"/>
+            <column name="deducted_at" type="TIMESTAMP"/>
+        </addColumn>
+        <addColumn tableName="liability_settlements">
+            <column name="reason" type="VARCHAR(40)"/>
+        </addColumn>
+    </changeSet>
+
+</databaseChangeLog>

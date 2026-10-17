@@ -27,7 +27,8 @@ public class AuthDtos {
                                 String frequency, Integer dueDay,
                                 String tenancyType, BigDecimal maintenanceAmount,
                                 BigDecimal leaseUpfrontAmount, BigDecimal leaseUpfrontCollected,
-                                String leaseUpfrontNotes) {}
+                                String leaseUpfrontNotes,
+                                BigDecimal nominalElectricityAmount, BigDecimal nominalWaterAmount) {}
 
     public record TenantUpdateRequest(String tenantName, String tenantPhone, String tenantEmail,
                                       BigDecimal rentAmount, BigDecimal securityDeposit,
@@ -35,11 +36,16 @@ public class AuthDtos {
                                       String frequency, Integer dueDay,
                                       String tenancyType, BigDecimal maintenanceAmount,
                                       BigDecimal leaseUpfrontAmount, BigDecimal leaseUpfrontCollected,
-                                      String leaseUpfrontNotes) {}
+                                      String leaseUpfrontNotes,
+                                      BigDecimal nominalElectricityAmount, BigDecimal nominalWaterAmount) {}
 
     /** Settle (refund/repay) part of a refundable liability held against a tenancy. */
     public record LiabilitySettleRequest(@NotBlank String kind, @NotNull BigDecimal amount,
-                                         LocalDate settledDate, String notes) {}
+                                         LocalDate settledDate, String notes, String reason) {}
+
+    /** Vacate a tenancy with an optional deposit deduction (damages/painting/etc.). */
+    public record VacateRequest(LocalDate vacateDate, BigDecimal deductionAmount,
+                                String deductionReason) {}
 
     public record CollectRentRequest(@NotNull Long tenancyId, @NotBlank String month, @NotNull Integer year,
                                      BigDecimal rentAmount, BigDecimal ebillAmount,

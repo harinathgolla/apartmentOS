@@ -32,6 +32,7 @@ type Tenancy = {
   frequency?: string; dueDay?: number;
   tenancyType?: string; maintenanceAmount?: number;
   leaseUpfrontAmount?: number; leaseUpfrontCollected?: number; leaseUpfrontNotes?: string | null;
+  deductionAmount?: number; deductionReason?: string | null; vacateDate?: string | null;
   active: boolean;
 };
 type MeterCfg = {
@@ -63,6 +64,7 @@ export default function TenantsPage() {
     { mode: "create" } | { mode: "edit"; flat: Flat } | null
   >(null);
   const [showFlats, setShowFlats] = useState(false);
+  const [vacateFor, setVacateFor] = useState<Tenancy | null>(null);
 
   useEffect(() => {
     api.get<Apartment[]>("/api/owner/apartments")
@@ -408,7 +410,7 @@ export default function TenantsPage() {
                             size="icon"
                             variant="ghost"
                             className="h-8 w-8 text-amber-600 hover:bg-amber-50"
-                            onClick={() => markInactive(t, load)}
+                            onClick={() => setVacateFor(t)}
                             title="Mark as vacated"
                             aria-label="Mark as vacated"
                           >
@@ -452,11 +454,20 @@ export default function TenantsPage() {
         />
       )}
 
+      {vacateFor && (
+        <VacateModal
+          tenant={vacateFor}
+          onClose={() => setVacateFor(null)}
+          onDone={() => { setVacateFor(null); load(); }}
+        />
+      )}
+
       {flatModal && selectedAptId && (
         <FlatFormModal
           mode={flatModal.mode}
           apartmentId={selectedAptId}
           flat={flatModal.mode === "edit" ? flatModal.flat : null}
+          meters={meters}
           onClose={() => setFlatModal(null)}
           onDone={() => {
             setFlatModal(null);
@@ -490,6 +501,88 @@ async function markInactive(t: Tenancy, reload: () => void) {
   }
 }
 
+function VacateModal({ tenant, onClose, onDone }: {
+  tenant: Tenancy; onClose: () => void; onDone: () => void;
+}) {
+  const [vacateDate, setVacateDate] = useState(new Date().toISOString().slice(0, 10));
+  const [deduct, setDeduct] = useState("");
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const rent = num(tenant.rentAmount);
+
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+
+  async function submit() {
+    setBusy(true);
+    try {
+      await api.post(`/api/owner/tenants/${tenant.id}/vacate`, {
+        vacateDate: vacateDate || null,
+        deductionAmount: deduct ? Number(deduct) : null,
+        deductionReason: reason.trim() || null,
+      });
+      toast.success(`${tenant.tenantName} vacated`);
+      onDone();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message ?? "Failed to vacate");
+    } finally { setBusy(false); }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 md:p-6"
+      onClick={onClose} role="dialog" aria-modal="true">
+      <div className="bg-card rounded-2xl border border-border max-w-lg w-full"
+        onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between p-5 border-b border-border/60">
+          <div>
+            <h2 className="text-lg font-semibold">Vacate {tenant.tenantName}</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Deductions are kept as audit history for future reference.
+            </p>
+          </div>
+          <button onClick={onClose} className="rounded-lg p-1.5 hover:bg-accent" aria-label="Close">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="p-5 space-y-3">
+          <div>
+            <Label>Vacate date</Label>
+            <Input type="date" value={vacateDate} onChange={(e) => setVacateDate(e.target.value)} />
+          </div>
+          <div>
+            <Label>Deduction from deposit (₹)</Label>
+            <Input type="number" value={deduct} onChange={(e) => setDeduct(e.target.value)} placeholder="0" />
+            <div className="flex flex-wrap gap-2 mt-2">
+              <Button size="sm" variant="outline" onClick={() => { setDeduct(String(rent)); setReason("Painting charges (1 month rent)"); }}>
+                Painting — 1 month rent
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setReason("Damages")}>Damages</Button>
+              <Button size="sm" variant="outline" onClick={() => setReason("Cleaning")}>Cleaning</Button>
+            </div>
+          </div>
+          <div>
+            <Label>Reason</Label>
+            <Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Painting charges" />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Deposit held: {fmtINR(tenant.securityDeposit)} · Deducting {fmtINR(deduct ? Number(deduct) : 0)} · Refundable {fmtINR(Math.max(0, num(tenant.securityDeposit) - (deduct ? Number(deduct) : 0)))}.
+            Record the actual refund on the Liabilities page.
+          </p>
+        </div>
+        <div className="flex items-center justify-end gap-2 p-5 border-t border-border/60">
+          <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
+          <Button variant="gradient" onClick={submit} disabled={busy}>
+            {busy && <Loader2 className="h-4 w-4 animate-spin" />} Confirm vacate
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 async function markActive(t: Tenancy, reload: () => void) {
   try {
     await api.post(`/api/owner/tenants/${t.id}/reactivate`);
@@ -504,14 +597,18 @@ async function markActive(t: Tenancy, reload: () => void) {
    FLAT FORM MODAL
    ═══════════════════════════════════════════════════════════════════ */
 function FlatFormModal({
-  mode, apartmentId, flat, onClose, onDone,
+  mode, apartmentId, flat, meters, onClose, onDone,
 }: {
   mode: "create" | "edit";
   apartmentId: number;
   flat: Flat | null;
+  meters: MeterCfg[];
   onClose: () => void;
   onDone: () => void;
 }) {
+  const flatMeters = flat ? meters.filter((m) => m.flatId === flat.id) : [];
+  const elecMeter = flatMeters.find((m) => m.utilityType === "ELECTRICITY");
+  const waterMeter = flatMeters.find((m) => m.utilityType === "WATER");
   const isEdit = mode === "edit" && flat;
   const [form, setForm] = useState({
     flatNo: flat?.flatNo ?? "",
@@ -557,8 +654,9 @@ function FlatFormModal({
         nominalWaterAmount: form.nominalWaterAmount ? Number(form.nominalWaterAmount) : null,
       };
       if (isEdit && flat) {
-        toast.info("Editing flats is coming next — delete and re-add for now");
-        onClose();
+        await api.put(`/api/owner/apartments/${apartmentId}/flats/${flat.id}`, payload);
+        toast.success(`Flat ${form.flatNo} updated`);
+        onDone();
         return;
       }
       await api.post(`/api/owner/apartments/${apartmentId}/flats`, payload);
@@ -639,14 +737,20 @@ function FlatFormModal({
             />
           </div>
           <div className="md:col-span-2">
-            <Label>Meter serial number</Label>
-            <Input
-              value={form.meterSerialNo}
-              onChange={(e) =>
-                setForm({ ...form, meterSerialNo: e.target.value })
-              }
-              placeholder="119926"
-            />
+            <Label>Meters assigned to this flat</Label>
+            <div className="rounded-lg border bg-muted/40 px-3 py-2 text-sm space-y-1">
+              <div>
+                <span className="text-muted-foreground">Electricity: </span>
+                {elecMeter ? (elecMeter.serialNo || elecMeter.label || `Meter #${elecMeter.id}`) : "— none —"}
+              </div>
+              <div>
+                <span className="text-muted-foreground">Water: </span>
+                {waterMeter ? (waterMeter.serialNo || waterMeter.label || `Meter #${waterMeter.id}`) : "— none —"}
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Add or change meters on the <b>Meters</b> page. They are assigned per flat there.
+            </p>
           </div>
           <div className="md:col-span-2">
             <Label>Area (sqft)</Label>
@@ -664,7 +768,9 @@ function FlatFormModal({
               value={form.nominalElectricityAmount}
               onChange={(e) => setForm({ ...form, nominalElectricityAmount: e.target.value })}
               placeholder="For flats without a meter"
+              disabled={!!elecMeter}
             />
+            {elecMeter && <p className="text-xs text-muted-foreground mt-1">Metered — nominal disabled.</p>}
           </div>
           <div>
             <Label>Nominal water (Rs / month)</Label>
@@ -673,7 +779,9 @@ function FlatFormModal({
               value={form.nominalWaterAmount}
               onChange={(e) => setForm({ ...form, nominalWaterAmount: e.target.value })}
               placeholder="For flats without a meter"
+              disabled={!!waterMeter}
             />
+            {waterMeter && <p className="text-xs text-muted-foreground mt-1">Metered — nominal disabled.</p>}
           </div>
         </div>
 
@@ -743,12 +851,30 @@ function TenantFormModal({
     leaseUpfrontAmount: tenant?.leaseUpfrontAmount != null ? String(tenant.leaseUpfrontAmount) : "",
     leaseUpfrontCollected: tenant?.leaseUpfrontCollected != null ? String(tenant.leaseUpfrontCollected) : "",
     leaseUpfrontNotes: tenant?.leaseUpfrontNotes ?? "",
+    nominalElectricityAmount: "",
+    nominalWaterAmount: "",
   });
 
   const selectedFlat = flats.find((f) => String(f.id) === form.flatId);
   const flatMeters = meters.filter((m) => m.flatId === selectedFlat?.id);
   const selectedMeter = flatMeters[0];
   const isLease = form.tenancyType === "LEASE";
+  // When a flat carries a nominal charge, meter/reading details are irrelevant.
+  const flatHasNominalElec = selectedFlat?.nominalElectricityAmount != null && Number(selectedFlat.nominalElectricityAmount) > 0;
+  const flatHasNominalWater = selectedFlat?.nominalWaterAmount != null && Number(selectedFlat.nominalWaterAmount) > 0;
+  const showMeterInfo = !flatHasNominalElec && !flatHasNominalWater;
+
+  // Nominal inputs seed from the selected flat so edits are visible and round-trip.
+  useEffect(() => {
+    if (!selectedFlat) return;
+    setForm((f) => ({
+      ...f,
+      nominalElectricityAmount: selectedFlat.nominalElectricityAmount != null
+        ? String(selectedFlat.nominalElectricityAmount) : "",
+      nominalWaterAmount: selectedFlat.nominalWaterAmount != null
+        ? String(selectedFlat.nominalWaterAmount) : "",
+    }));
+  }, [selectedFlat?.id]);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -797,6 +923,8 @@ function TenantFormModal({
           leaseUpfrontAmount: form.leaseUpfrontAmount ? Number(form.leaseUpfrontAmount) : null,
           leaseUpfrontCollected: form.leaseUpfrontCollected ? Number(form.leaseUpfrontCollected) : null,
           leaseUpfrontNotes: form.leaseUpfrontNotes.trim() || null,
+          nominalElectricityAmount: form.nominalElectricityAmount ? Number(form.nominalElectricityAmount) : null,
+          nominalWaterAmount: form.nominalWaterAmount ? Number(form.nominalWaterAmount) : null,
         });
         toast.success("Tenant updated");
       } else {
@@ -818,6 +946,8 @@ function TenantFormModal({
           leaseUpfrontAmount: form.leaseUpfrontAmount ? Number(form.leaseUpfrontAmount) : null,
           leaseUpfrontCollected: form.leaseUpfrontCollected ? Number(form.leaseUpfrontCollected) : null,
           leaseUpfrontNotes: form.leaseUpfrontNotes.trim() || null,
+          nominalElectricityAmount: form.nominalElectricityAmount ? Number(form.nominalElectricityAmount) : null,
+          nominalWaterAmount: form.nominalWaterAmount ? Number(form.nominalWaterAmount) : null,
         });
         toast.success("Tenant onboarded");
       }
@@ -934,34 +1064,42 @@ function TenantFormModal({
             )}
           </div>
 
-          {/* ── Meter + nominal (read-only, from flat) ── */}
+          {/* ── Meter (only when the flat has NO nominal charge) ── */}
+          {selectedFlat && showMeterInfo && (
+            <div className="md:col-span-2">
+              <Label>Meter serial no.</Label>
+              <div className="h-10 flex items-center rounded-lg border bg-muted/40 px-3 text-sm">
+                {selectedMeter?.serialNo || selectedFlat.meterSerialNo || "No meter assigned"}
+                {selectedMeter && (
+                  <span className="ml-2 text-xs text-muted-foreground">
+                    ({selectedMeter.utilityType.toLowerCase()})
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Assigned to this flat in apartment setup.
+              </p>
+            </div>
+          )}
+
+          {/* ── Nominal utility — editable here, saved back to the flat ── */}
           {selectedFlat && (
             <>
               <div>
-                <Label>Meter serial no.</Label>
-                <div className="h-10 flex items-center rounded-lg border bg-muted/40 px-3 text-sm">
-                  {selectedMeter?.serialNo || selectedFlat.meterSerialNo || "No meter assigned"}
-                  {selectedMeter && (
-                    <span className="ml-2 text-xs text-muted-foreground">
-                      ({selectedMeter.utilityType.toLowerCase()})
-                    </span>
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Assigned to this flat in apartment setup.
-                </p>
+                <Label>Nominal electricity (₹ / month)</Label>
+                <Input type="number" value={form.nominalElectricityAmount}
+                  onChange={(e) => setForm({ ...form, nominalElectricityAmount: e.target.value })}
+                  placeholder="Blank = billed by meter" />
               </div>
               <div>
-                <Label>Nominal utility (from flat)</Label>
-                <div className="h-10 flex items-center gap-3 rounded-lg border bg-muted/40 px-3 text-sm">
-                  <span>Elec: {selectedFlat.nominalElectricityAmount != null ? fmtINR(selectedFlat.nominalElectricityAmount) : "—"}</span>
-                  <span className="text-muted-foreground">·</span>
-                  <span>Water: {selectedFlat.nominalWaterAmount != null ? fmtINR(selectedFlat.nominalWaterAmount) : "—"}</span>
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Fixed monthly charge when the flat has no meter.
-                </p>
+                <Label>Nominal water (₹ / month)</Label>
+                <Input type="number" value={form.nominalWaterAmount}
+                  onChange={(e) => setForm({ ...form, nominalWaterAmount: e.target.value })}
+                  placeholder="Blank = billed by meter" />
               </div>
+              <p className="md:col-span-2 text-xs text-muted-foreground -mt-1">
+                A nominal amount replaces meter billing for this flat and is saved to the flat record.
+              </p>
             </>
           )}
 
@@ -1097,14 +1235,38 @@ function TenantFormModal({
             <Input
               type="date"
               value={form.startDate}
-              onChange={(e) =>
-                setForm({ ...form, startDate: e.target.value })
-              }
+              onChange={(e) => {
+                const start = e.target.value;
+                // RENTAL agreements default to an 11-month term (item 6).
+                if (start && !isLease) {
+                  const d = new Date(start);
+                  d.setMonth(d.getMonth() + 11);
+                  setForm({
+                    ...form,
+                    startDate: start,
+                    endDate: d.toISOString().slice(0, 10),
+                  });
+                } else {
+                  setForm({ ...form, startDate: start });
+                }
+              }}
             />
           </div>
 
           <div>
-            <Label>End date</Label>
+            <Label>
+              End date
+              {!isLease && (
+                <span className="ml-1 text-xs text-muted-foreground font-normal">
+                  auto: start + 11 months
+                </span>
+              )}
+              {isLease && (
+                <span className="ml-1 text-xs text-muted-foreground font-normal">
+                  enter lease period
+                </span>
+              )}
+            </Label>
             <Input
               type="date"
               value={form.endDate}

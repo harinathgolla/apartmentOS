@@ -65,6 +65,12 @@ public class OwnerController {
         return aptSvc.addFlat(aptId, r);
     }
 
+    @PutMapping("/apartments/{aptId}/flats/{flatId}")
+    public Flat updateFlat(@PathVariable Long aptId, @PathVariable Long flatId,
+                           @Valid @RequestBody FlatRequest r) {
+        return aptSvc.updateFlat(aptId, flatId, r);
+    }
+
     /** List flats. If apartmentId is omitted, uses the primary (first) apartment. */
     @GetMapping("/flats")
     public List<Flat> flats(@RequestParam(required = false) Long apartmentId) {
@@ -97,6 +103,13 @@ public class OwnerController {
 
     @PostMapping("/tenants/{id}/deactivate")
     public Tenancy deactivateTenant(@PathVariable Long id) { return tenantSvc.deactivate(id, orgId()); }
+
+    /** Vacate with an optional deposit deduction — kept as audit history. */
+    @PostMapping("/tenants/{id}/vacate")
+    public Tenancy vacateTenant(@PathVariable Long id, @RequestBody(required = false) VacateRequest r) {
+        if (r == null) return tenantSvc.vacate(id, orgId(), null, null, null);
+        return tenantSvc.vacate(id, orgId(), r.vacateDate(), r.deductionAmount(), r.deductionReason());
+    }
 
     @PostMapping("/tenants/{id}/reactivate")
     public Tenancy reactivateTenant(@PathVariable Long id) { return tenantSvc.reactivate(id, orgId()); }
