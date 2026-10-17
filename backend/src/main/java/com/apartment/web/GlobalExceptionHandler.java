@@ -20,7 +20,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, Object>> handleBadRequest(IllegalArgumentException e) {
         log.warn("Bad request: {}", e.getMessage());
-        return body(HttpStatus.UNAUTHORIZED, e.getMessage());
+        return body(HttpStatus.BAD_REQUEST, e.getMessage());
     }
 
     @ExceptionHandler(IllegalStateException.class)

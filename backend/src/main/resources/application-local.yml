@@ -1,0 +1,17 @@
+# Local-only diagnostics. Activate with: --spring.profiles.active=local
+# SQL bind logging can expose personal/financial data; never activate this profile in production.
+logging:
+  file:
+    path: ${LOG_PATH:logs}
+  level:
+    com.apartment: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.orm.jdbc.bind: TRACE
+    org.springframework.transaction: DEBUG
+
+spring:
+  jpa:
+    show-sql: false # Use Logback instead, so SQL is timestamped and routed to console/file.
+    properties:
+      hibernate:
+        generate_statistics: true
