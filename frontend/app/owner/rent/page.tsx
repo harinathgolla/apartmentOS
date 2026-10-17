@@ -15,6 +15,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { api } from "@/lib/api";
+import { DeleteButton } from "@/components/ui/delete-button";
 import { fmtINR } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -371,6 +372,14 @@ export default function RentPage() {
                       )}
                     </TableCell>
                     <TableCell className="text-right">
+                      {row.existing?.id != null && (
+                        <DeleteButton
+                          url={`/api/owner/rent/${row.existing.id}`}
+                          label={`rent record for ${row.tenancy.tenantName}`}
+                          description="Delete this month's rent record"
+                          onDeleted={load}
+                        />
+                      )}
                       {isPaid ? (
                         <Button
                           size="sm"

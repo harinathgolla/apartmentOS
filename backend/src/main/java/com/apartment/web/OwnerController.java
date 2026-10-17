@@ -23,6 +23,8 @@ public class OwnerController {
     private final ExpenseService expenseSvc;
     private final ReminderService reminderSvc;
     private final ApartmentRepository apartments;
+    private final DeletionService deletionSvc;
+    private final AuditService auditSvc;
 
     private AuthDetails ctx() {
         return (AuthDetails) SecurityContextHolder.getContext().getAuthentication().getDetails();
@@ -57,7 +59,17 @@ public class OwnerController {
     }
 
     @DeleteMapping("/apartments/{id}")
-    public void deleteApartment(@PathVariable Long id) { aptSvc.delete(id, orgId()); }
+    public Map<String, Object> deleteApartment(@PathVariable Long id,
+                                               @RequestParam(defaultValue = "false") boolean cascade) {
+        return deletionSvc.deleteApartment(ctx(), id, cascade);
+    }
+
+    /** Preview of what a cascade delete would remove. */
+    @GetMapping("/apartments/{id}/delete-impact")
+    public Map<String, Object> apartmentDeleteImpact(@PathVariable Long id) {
+        aptSvc.getById(id, orgId());
+        return deletionSvc.apartmentImpact(id);
+    }
 
     /* ─────────── Flats ─────────── */
     @PostMapping("/apartments/{aptId}/flats")
@@ -71,6 +83,17 @@ public class OwnerController {
         return aptSvc.updateFlat(aptId, flatId, r);
     }
 
+    @DeleteMapping("/apartments/{aptId}/flats/{flatId}")
+    public Map<String, Object> deleteFlat(@PathVariable Long aptId, @PathVariable Long flatId,
+                                          @RequestParam(defaultValue = "false") boolean cascade) {
+        return deletionSvc.deleteFlat(ctx(), aptId, flatId, cascade);
+    }
+
+    @GetMapping("/apartments/{aptId}/flats/{flatId}/delete-impact")
+    public Map<String, Object> flatDeleteImpact(@PathVariable Long aptId, @PathVariable Long flatId) {
+        return deletionSvc.flatImpact(aptId, flatId);
+    }
+
     /** List flats. If apartmentId is omitted, uses the primary (first) apartment. */
     @GetMapping("/flats")
     public List<Flat> flats(@RequestParam(required = false) Long apartmentId) {
@@ -81,7 +104,9 @@ public class OwnerController {
     /* ─────────── Tenants ─────────── */
     @PostMapping("/tenants")
     public Tenancy onboard(@Valid @RequestBody TenantRequest r) {
-        return tenantSvc.onboard(orgId(), r);
+        Tenancy t = tenantSvc.onboard(orgId(), r);
+        auditSvc.record(ctx(), "Tenancy", t.getId(), "CREATE", null, t);
+        return t;
     }
 
     /** By default, returns active tenants. Pass ?all=true to include inactive ones. */
@@ -98,17 +123,31 @@ public class OwnerController {
 
     @PutMapping("/tenants/{id}")
     public Tenancy updateTenant(@PathVariable Long id, @RequestBody TenantUpdateRequest r) {
-        return tenantSvc.update(id, orgId(), r);
+        Tenancy before = tenantSvc.getById(id, orgId());
+        Tenancy after = tenantSvc.update(id, orgId(), r);
+        auditSvc.record(ctx(), "Tenancy", id, "UPDATE", before, after);
+        return after;
     }
 
     @PostMapping("/tenants/{id}/deactivate")
     public Tenancy deactivateTenant(@PathVariable Long id) { return tenantSvc.deactivate(id, orgId()); }
 
+    @DeleteMapping("/tenants/{id}")
+    public Map<String, Object> deleteTenant(@PathVariable Long id,
+                                            @RequestParam(defaultValue = "false") boolean cascade) {
+        Tenancy t = tenantSvc.getById(id, orgId());
+        return deletionSvc.deleteTenancy(ctx(), t.getApartmentId(), id, cascade);
+    }
+
     /** Vacate with an optional deposit deduction — kept as audit history. */
     @PostMapping("/tenants/{id}/vacate")
     public Tenancy vacateTenant(@PathVariable Long id, @RequestBody(required = false) VacateRequest r) {
-        if (r == null) return tenantSvc.vacate(id, orgId(), null, null, null);
-        return tenantSvc.vacate(id, orgId(), r.vacateDate(), r.deductionAmount(), r.deductionReason());
+        Tenancy before = tenantSvc.getById(id, orgId());
+        Tenancy after = (r == null)
+                ? tenantSvc.vacate(id, orgId(), null, null, null)
+                : tenantSvc.vacate(id, orgId(), r.vacateDate(), r.deductionAmount(), r.deductionReason());
+        auditSvc.record(ctx(), "Tenancy", id, "VACATE", before, after);
+        return after;
     }
 
     @PostMapping("/tenants/{id}/reactivate")
@@ -125,13 +164,21 @@ public class OwnerController {
     /** Record a rent payment for one tenant. */
     @PostMapping("/rent/collect")
     public RentRecord collect(@Valid @RequestBody CollectRentRequest r) {
-        return rentSvc.collect(requireApartmentId(), r);
+        RentRecord rec = rentSvc.collect(requireApartmentId(), r);
+        auditSvc.record(ctx(), "RentRecord", rec.getId(), "COLLECT", null, rec);
+        return rec;
     }
 
     /** Bulk-collect: mark a set of tenancies (or all active) as paid for the month. */
     @PostMapping("/rent/bulk-collect")
     public Map<String, Object> bulkCollect(@Valid @RequestBody BulkCollectRequest r) {
         return rentSvc.bulkCollect(requireApartmentId(), r);
+    }
+
+    /** Delete a single rent record. */
+    @DeleteMapping("/rent/{id}")
+    public Map<String, Object> deleteRentRecord(@PathVariable Long id) {
+        return deletionSvc.deleteRentRecord(ctx(), requireApartmentId(), id);
     }
 
     /** Owner-facing maintenance coverage: maintenance collected vs common-area outgo. */

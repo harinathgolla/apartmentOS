@@ -14,6 +14,8 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { api } from "@/lib/api";
+import { DeleteButton } from "@/components/ui/delete-button";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { fmtINR } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -247,6 +249,13 @@ export default function TenantsPage() {
                       >
                         {occupied ? "Occupied" : "Vacant"}
                       </Badge>
+                      <DeleteButton
+                        url={`/api/owner/apartments/${selectedAptId}/flats/${f.id}`}
+                        impactUrl={`/api/owner/apartments/${selectedAptId}/flats/${f.id}/delete-impact`}
+                        label={`flat ${f.flatNo}`}
+                        description="Delete this flat and its dependent records"
+                        onDeleted={load}
+                      />
                       <Button
                         size="icon"
                         variant="ghost"
@@ -428,6 +437,12 @@ export default function TenantsPage() {
                             <UserCheck className="h-3.5 w-3.5" />
                           </Button>
                         )}
+                        <DeleteButton
+                          url={`/api/owner/tenants/${t.id}`}
+                          label={`tenant ${t.tenantName}`}
+                          description="Permanently delete this tenancy (cascades rent records + settlements)"
+                          onDeleted={load}
+                        />
                       </div>
                     </TableCell>
                   </TableRow>
@@ -485,21 +500,8 @@ const num = (v: unknown) => {
   return Number.isFinite(n) ? n : 0;
 };
 
-async function markInactive(t: Tenancy, reload: () => void) {
-  if (
-    !window.confirm(
-      `Mark ${t.tenantName} as vacated? They'll move to the "Past tenants" tab.`
-    )
-  )
-    return;
-  try {
-    await api.post(`/api/owner/tenants/${t.id}/deactivate`);
-    toast.success(`${t.tenantName} marked as vacated`);
-    reload();
-  } catch (e: any) {
-    toast.error(e?.response?.data?.message ?? "Failed to deactivate");
-  }
-}
+/* markInactive was superseded by VacateModal (which records the deduction
+a   and vacate date). Kept out of the file to avoid two vacate paths. */
 
 function VacateModal({ tenant, onClose, onDone }: {
   tenant: Tenancy; onClose: () => void; onDone: () => void;
@@ -620,6 +622,7 @@ function FlatFormModal({
     nominalWaterAmount: flat?.nominalWaterAmount != null ? String(flat.nominalWaterAmount) : "",
   });
   const [busy, setBusy] = useState(false);
+  const confirm = useConfirm();
 
   useEffect(() => {
     const prev = document.body.style.overflow;
@@ -671,10 +674,59 @@ function FlatFormModal({
 
   async function remove() {
     if (!flat) return;
-    if (!window.confirm(`Delete flat "${flat.flatNo}"? This cannot be undone.`))
-      return;
-    toast.info("Flat deletion endpoint coming next");
-    onClose();
+    const ok = await confirm({
+      title: `Delete flat ${flat.flatNo}?`,
+      description: "This permanently removes the flat and every record attached to it.",
+      tone: "danger",
+      confirmLabel: "Delete flat",
+    });
+    if (!ok) return;
+
+    setBusy(true);
+    try {
+      await api.delete(`/api/owner/apartments/${apartmentId}/flats/${flat.id}`);
+      toast.success(`Flat ${flat.flatNo} deleted`);
+      onDone();
+    } catch (e: any) {
+      if (e?.response?.status !== 409) {
+        toast.error(e?.response?.data?.message ?? "Failed to delete flat");
+        setBusy(false);
+        return;
+      }
+      // Dependents exist — show what will go, then cascade.
+      let impact: Record<string, any> | null = null;
+      try {
+        impact = (await api.get(
+          `/api/owner/apartments/${apartmentId}/flats/${flat.id}/delete-impact`
+        )).data;
+      } catch { /* optional */ }
+
+      const details = impact
+        ? Object.entries(impact)
+            .map(([k, raw]) => ({ k, v: typeof raw === "number" ? raw : Number.NaN }))
+            .filter((x) => Number.isFinite(x.v) && x.v > 0)
+            .map((x) => `${x.v} ${x.k.replace(/([A-Z])/g, " $1").toLowerCase()}`)
+        : [];
+
+      const cascade = await confirm({
+        title: `Flat ${flat.flatNo} has dependent records`,
+        description: "Deleting the flat permanently removes all of the following. This cannot be undone.",
+        details,
+        tone: "danger",
+        confirmLabel: "Delete everything",
+      });
+      if (!cascade) { setBusy(false); return; }
+
+      try {
+        await api.delete(`/api/owner/apartments/${apartmentId}/flats/${flat.id}`, {
+          params: { cascade: true },
+        });
+        toast.success(`Flat ${flat.flatNo} and its records deleted`);
+        onDone();
+      } catch (e2: any) {
+        toast.error(e2?.response?.data?.message ?? "Failed to delete flat");
+      } finally { setBusy(false); }
+    }
   }
 
   return (

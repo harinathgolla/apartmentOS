@@ -13,6 +13,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { api } from "@/lib/api";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { toast } from "sonner";
 
 type Apartment = { id: number; name: string; city?: string };
@@ -26,6 +27,7 @@ type Meter = {
 };
 
 export default function MetersPage() {
+  const confirm = useConfirm();
   const [apartments, setApartments] = useState<Apartment[]>([]);
   const [selectedAptId, setSelectedAptId] = useState<number | null>(null);
   const [flats, setFlats] = useState<Flat[]>([]);
@@ -66,7 +68,13 @@ export default function MetersPage() {
 
   async function remove(m: Meter) {
     if (!selectedAptId) return;
-    if (!window.confirm(`Delete meter "${m.label ?? m.serialNo ?? m.id}"?`)) return;
+    const ok = await confirm({
+      title: "Delete meter?",
+      description: `Meter "${m.label ?? m.serialNo ?? m.id}" will be removed. Existing readings keep their history but lose the meter link.`,
+      tone: "danger",
+      confirmLabel: "Delete meter",
+    });
+    if (!ok) return;
     try {
       await api.delete(`/api/owner/meters/${m.id}`, { params: { apartmentId: selectedAptId } });
       toast.success("Meter deleted");

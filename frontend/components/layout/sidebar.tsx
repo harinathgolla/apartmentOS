@@ -21,6 +21,7 @@ const items = [
   { href: "/owner/pnl",         label: "P&L / ROI",   icon: LineChart },
   { href: "/owner/import",      label: "Import",      icon: FileSpreadsheet },
   { href: "/owner/reminders",   label: "Reminders",   icon: Bell },
+  { href: "/owner/audit",       label: "Audit log",   icon: History },
 ];
 
 export function Sidebar() {

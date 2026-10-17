@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { api, getMe } from "@/lib/api";
 import { fmtINR } from "@/lib/utils";
 import { toast } from "sonner";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 const MONTHS = [
   "April","May","June","July","August","September",
@@ -339,6 +340,7 @@ function ApartmentFormModal({
     loanInterestRate: apartment?.loanInterestRate ?? "",
   });
   const [busy, setBusy] = useState(false);
+  const confirm = useConfirm();
 
   // Lock body scroll while the modal is open
   useEffect(() => {
@@ -384,13 +386,54 @@ function ApartmentFormModal({
     } finally { setBusy(false); }
   }
 
+  /**
+   * Apartment delete is a hard cascade. Attempt without cascade first; if the
+   * backend reports dependents (409) we surface the impact and require an
+   * explicit second confirmation before sending cascade=true.
+   */
   async function remove() {
     if (!apartment) return;
-    if (!window.confirm(`Delete "${apartment.name}"? This cannot be undone.`)) return;
     setBusy(true);
     try {
       await api.delete(`/api/owner/apartments/${apartment.id}`);
       toast.success("Apartment deleted");
+      onDone();
+      return;
+    } catch (e: any) {
+      if (e?.response?.status !== 409) {
+        toast.error(e?.response?.data?.message ?? "Failed to delete apartment");
+        setBusy(false);
+        return;
+      }
+    }
+
+    // Dependent records exist — fetch the impact breakdown for the dialog.
+    let impact: Record<string, any> | null = null;
+    try {
+      impact = (await api.get(`/api/owner/apartments/${apartment.id}/delete-impact`)).data;
+    } catch { /* impact is optional context */ }
+
+    const lines = impact
+      ? Object.entries(impact)
+          .map(([k, raw]) => ({ k, v: typeof raw === "number" ? raw : Number.NaN }))
+          .filter((e) => Number.isFinite(e.v) && e.v > 0)
+          .map((e) => `${e.v} ${e.k.replace(/([A-Z])/g, " $1").toLowerCase()}`)
+      : [];
+
+    const ok = await confirm({
+      title: `Delete "${apartment.name}"?`,
+      description: lines.length
+        ? "Deleting this apartment permanently removes all of the following. This cannot be undone."
+        : "This apartment will be permanently deleted. This cannot be undone.",
+      details: lines,
+      tone: "danger",
+      confirmLabel: lines.length ? "Delete everything" : "Delete apartment",
+    });
+    if (!ok) { setBusy(false); return; }
+
+    try {
+      await api.delete(`/api/owner/apartments/${apartment.id}`, { params: { cascade: true } });
+      toast.success("Apartment and all dependent records deleted");
       onDone();
     } catch (e: any) {
       toast.error(e?.response?.data?.message ?? "Failed to delete apartment");

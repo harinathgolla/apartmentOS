@@ -20,6 +20,7 @@ public class UtilityBillController {
 
     private final UtilityBillService service;
     private final ApartmentRepository apartments;
+    private final com.apartment.service.AuditService auditSvc;
 
     private AuthDetails ctx() {
         return (AuthDetails) SecurityContextHolder.getContext().getAuthentication().getDetails();
@@ -44,7 +45,9 @@ public class UtilityBillController {
 
     @DeleteMapping("/{id}")
     public void delete(@PathVariable Long id) {
-        service.delete(requireApartmentId(), id);
+        Long aptId = requireApartmentId();
+        service.delete(aptId, id);
+        auditSvc.record(ctx(), "UtilityBill", id, "DELETE", null, null);
     }
 
     /** Suggested per-flat maintenance share from recover-via-maintenance bills for a period. */

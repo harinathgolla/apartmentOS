@@ -14,11 +14,13 @@ import { toast } from "sonner";
 import { MeterReadingModal, type Flat, type MeterRow } from "@/components/utilities/meter-reading-modal";
 import { UtilityBillModal, type UtilityBill } from "@/components/utilities/utility-bill-modal";
 import { CommonMeterModal } from "@/components/utilities/common-meter-modal";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 type Tab = "overview" | "electricity" | "water" | "bills";
 
 export default function UtilitiesPage() {
+  const confirm = useConfirm();
   const [tab, setTab] = useState<Tab>("overview");
   const [rows, setRows] = useState<any[]>([]);
   const [flats, setFlats] = useState<Flat[]>([]);
@@ -60,7 +62,13 @@ export default function UtilitiesPage() {
   useEffect(() => { loadBills(); }, [loadBills]);
 
   async function deleteBill(id: number) {
-    if (!window.confirm("Delete this bill? The linked expense will also be removed.")) return;
+    const ok = await confirm({
+      title: "Delete this bill?",
+      description: "The utility bill and its linked expense entry will both be removed. This cannot be undone.",
+      tone: "danger",
+      confirmLabel: "Delete bill",
+    });
+    if (!ok) return;
     try {
       await api.delete(`/api/owner/utility-bills/${id}`);
       toast.success("Bill deleted");

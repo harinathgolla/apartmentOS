@@ -20,6 +20,7 @@ public class LiabilityController {
 
     private final LiabilityService liabilitySvc;
     private final ApartmentRepository apartments;
+    private final com.apartment.service.AuditService auditSvc;
 
     private AuthDetails ctx() {
         return (AuthDetails) SecurityContextHolder.getContext().getAuthentication().getDetails();
@@ -44,7 +45,9 @@ public class LiabilityController {
     public LiabilitySettlement settle(@PathVariable Long tenancyId,
                                       @RequestParam(required = false) Long apartmentId,
                                       @Valid @RequestBody LiabilitySettleRequest r) {
-        return liabilitySvc.settle(requireApartmentId(apartmentId), tenancyId, r);
+        var s = liabilitySvc.settle(requireApartmentId(apartmentId), tenancyId, r);
+        auditSvc.record(ctx(), "LiabilitySettlement", s.getId(), "SETTLE", null, s);
+        return s;
     }
 
     /** Settlement history for one tenancy. */
