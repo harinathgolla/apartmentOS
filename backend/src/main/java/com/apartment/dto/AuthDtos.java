@@ -25,13 +25,21 @@ public class AuthDtos {
                                 @NotNull Long flatId, BigDecimal rentAmount, BigDecimal securityDeposit,
                                 LocalDate startDate, LocalDate endDate,
                                 String frequency, Integer dueDay,
-                                String tenancyType, BigDecimal maintenanceAmount) {}
+                                String tenancyType, BigDecimal maintenanceAmount,
+                                BigDecimal leaseUpfrontAmount, BigDecimal leaseUpfrontCollected,
+                                String leaseUpfrontNotes) {}
 
     public record TenantUpdateRequest(String tenantName, String tenantPhone, String tenantEmail,
                                       BigDecimal rentAmount, BigDecimal securityDeposit,
                                       LocalDate startDate, LocalDate endDate, Boolean active,
                                       String frequency, Integer dueDay,
-                                      String tenancyType, BigDecimal maintenanceAmount) {}
+                                      String tenancyType, BigDecimal maintenanceAmount,
+                                      BigDecimal leaseUpfrontAmount, BigDecimal leaseUpfrontCollected,
+                                      String leaseUpfrontNotes) {}
+
+    /** Settle (refund/repay) part of a refundable liability held against a tenancy. */
+    public record LiabilitySettleRequest(@NotBlank String kind, @NotNull BigDecimal amount,
+                                         LocalDate settledDate, String notes) {}
 
     public record CollectRentRequest(@NotNull Long tenancyId, @NotBlank String month, @NotNull Integer year,
                                      BigDecimal rentAmount, BigDecimal ebillAmount,

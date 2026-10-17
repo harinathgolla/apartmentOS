@@ -66,6 +66,9 @@ public class TenantService {
                 .dueDay(r.dueDay() != null ? r.dueDay() : 5)
                 .tenancyType(parseTenancyType(r.tenancyType()))
                 .maintenanceAmount(r.maintenanceAmount() != null ? r.maintenanceAmount() : java.math.BigDecimal.ZERO)
+                .leaseUpfrontAmount(r.leaseUpfrontAmount() != null ? r.leaseUpfrontAmount() : java.math.BigDecimal.ZERO)
+                .leaseUpfrontCollected(r.leaseUpfrontCollected() != null ? r.leaseUpfrontCollected() : java.math.BigDecimal.ZERO)
+                .leaseUpfrontNotes(r.leaseUpfrontNotes())
                 .active(true)
                 .build();
         return tenancies.save(t);
@@ -103,6 +106,9 @@ public class TenantService {
         if (r.dueDay() != null) t.setDueDay(r.dueDay());
         if (r.tenancyType() != null) t.setTenancyType(parseTenancyType(r.tenancyType()));
         if (r.maintenanceAmount() != null) t.setMaintenanceAmount(r.maintenanceAmount());
+        if (r.leaseUpfrontAmount() != null) t.setLeaseUpfrontAmount(r.leaseUpfrontAmount());
+        if (r.leaseUpfrontCollected() != null) t.setLeaseUpfrontCollected(r.leaseUpfrontCollected());
+        if (r.leaseUpfrontNotes() != null) t.setLeaseUpfrontNotes(r.leaseUpfrontNotes());
         return tenancies.save(t);
     }
 

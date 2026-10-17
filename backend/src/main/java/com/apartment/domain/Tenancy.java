@@ -33,6 +33,12 @@ public class Tenancy {
     private TenancyType tenancyType = TenancyType.RENTAL;
     @Builder.Default
     private BigDecimal maintenanceAmount = BigDecimal.ZERO;
+    /* Lease upfront charge — one-time liability held by owner (not rent). */
+    @Builder.Default
+    private BigDecimal leaseUpfrontAmount = BigDecimal.ZERO;
+    @Builder.Default
+    private BigDecimal leaseUpfrontCollected = BigDecimal.ZERO;
+    private String leaseUpfrontNotes;
     private Instant createdAt = Instant.now();
 
     public enum Frequency { MONTHLY, WEEKLY, DAILY, QUARTERLY, YEARLY }

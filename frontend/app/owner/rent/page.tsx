@@ -25,11 +25,15 @@ const MONTHS = [
 const PAYMENT_MODES = ["CASH", "UPI", "BANK_TRANSFER", "CHEQUE", "ONLINE"];
 
 type Apartment = { id: number; name: string; city?: string };
-type Flat = { id: number; flatNo: string; apartmentId: number; floor?: number };
+type Flat = {
+  id: number; flatNo: string; apartmentId: number; floor?: number;
+  nominalElectricityAmount?: number | null; nominalWaterAmount?: number | null;
+};
 type Tenancy = {
   id: number; flatId: number; apartmentId: number;
   tenantName: string; tenantEmail?: string; tenantPhone?: string;
   rentAmount?: number; frequency?: string; dueDay?: number; active: boolean;
+  maintenanceAmount?: number; tenancyType?: string;
 };
 type RentRecord = {
   id?: number; tenancyId?: number; flatId: number; apartmentId: number;
@@ -57,6 +61,8 @@ type Row = {
   meterUnits?: number;
   elecPublic?: boolean;
   waterPublic?: boolean;
+  /** Fixed maintenance for the agreement term, from tenancy. */
+  maintFixed?: number;
 };
 
 const num = (v: unknown) => {
@@ -122,6 +128,7 @@ export default function RentPage() {
           meterUnits: mr?.usageUnits != null ? Number(mr.usageUnits) : undefined,
           elecPublic: pubKey.has(`${t.flatId}:ELECTRICITY`),
           waterPublic: pubKey.has(`${t.flatId}:WATER`),
+          maintFixed: t.maintenanceAmount != null ? Number(t.maintenanceAmount) : undefined,
         };
       });
       setRows(computed);
@@ -306,7 +313,9 @@ export default function RentPage() {
                   ? num(row.existing.ebillAmount)
                   : num(row.meterBill);
                 const water = num(row.existing?.waterBill);
-                const maint = num(row.existing?.maintenanceCharge);
+                const maint = row.maintFixed != null && row.maintFixed > 0
+                  ? row.maintFixed
+                  : num(row.existing?.maintenanceCharge);
                 const total = num(row.tenancy.rentAmount) + water + maint + ebill;
                 const isPaid = row.existing?.paid === true;
                 return (
@@ -415,9 +424,11 @@ function CollectModal({
       ? String(row.existing.ebillAmount)
       : (row.meterBill != null ? String(row.meterBill) : ""),
     waterBill: row.existing?.waterBill != null ? String(row.existing.waterBill) : "",
-    maintenanceCharge: row.existing?.maintenanceCharge != null
-      ? String(row.existing.maintenanceCharge)
-      : (maintSuggestion && maintSuggestion > 0 ? String(maintSuggestion) : ""),
+    maintenanceCharge: row.maintFixed != null && row.maintFixed > 0
+      ? String(row.maintFixed)
+      : (row.existing?.maintenanceCharge != null
+          ? String(row.existing.maintenanceCharge)
+          : (maintSuggestion && maintSuggestion > 0 ? String(maintSuggestion) : "")),
     paymentMode: row.existing?.paymentMode ?? "CASH",
     paidDate: row.existing?.paidDate ?? new Date().toISOString().slice(0, 10),
     remarks: row.existing?.remarks ?? "",
@@ -494,6 +505,16 @@ function CollectModal({
             <Input type="number" value={form.rentAmount}
               onChange={(e) => setForm({ ...form, rentAmount: e.target.value })} />
           </div>
+          {(row.flat?.nominalElectricityAmount != null || row.flat?.nominalWaterAmount != null) && (
+            <div className="md:col-span-2">
+              <Label>Nominal fixed utility (from flat — read only)</Label>
+              <div className="h-10 flex items-center gap-3 rounded-lg border bg-muted/40 px-3 text-sm">
+                <span>Elec: {row.flat?.nominalElectricityAmount != null ? fmtINR(row.flat.nominalElectricityAmount) : "—"}</span>
+                <span className="text-muted-foreground">·</span>
+                <span>Water: {row.flat?.nominalWaterAmount != null ? fmtINR(row.flat.nominalWaterAmount) : "—"}</span>
+              </div>
+            </div>
+          )}
           <div>
             <Label>
               Electricity (₹)
@@ -527,13 +548,14 @@ function CollectModal({
           <div>
             <Label>
               Maintenance (₹)
-              {row.existing?.maintenanceCharge == null && maintSuggestion && maintSuggestion > 0 && (
+              {row.maintFixed != null && row.maintFixed > 0 && (
                 <span className="ml-1 text-xs text-muted-foreground font-normal">
-                  suggested from utility bills
+                  fixed for agreement term
                 </span>
               )}
             </Label>
             <Input type="number" value={form.maintenanceCharge}
+              disabled={row.maintFixed != null && row.maintFixed > 0}
               onChange={(e) => setForm({ ...form, maintenanceCharge: e.target.value })} />
           </div>
 

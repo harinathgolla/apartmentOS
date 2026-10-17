@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.29.xsd">
+
+    <!--
+      024 - Lease upfront charge (one-time, non-rent liability held by owner).
+
+      For LEASE tenancies the owner may collect a one-time upfront amount on top of the
+      monthly rent (e.g. a lease advance / premium). This is a LIABILITY, not income:
+      it is recorded separately from rent collection and tracked as an outstanding
+      refundable/repayable balance until settled.
+
+      lease_upfront_amount           -> the amount agreed at onboarding (one-time)
+      lease_upfront_collected        -> how much of it has actually been received
+      lease_upfront_notes            -> free-text label/remarks (e.g. "3-month advance")
+
+      The existing security_deposit / deposit_refunded columns on tenancies are reused
+      as the second refundable liability. Both are surfaced on the new Liabilities page.
+    -->
+    <changeSet id="024-lease-upfront-charge" author="apartment-saas">
+        <addColumn tableName="tenancies">
+            <column name="lease_upfront_amount" type="DECIMAL(12,2)" defaultValueNumeric="0"/>
+            <column name="lease_upfront_collected" type="DECIMAL(12,2)" defaultValueNumeric="0"/>
+            <column name="lease_upfront_notes" type="VARCHAR(255)"/>
+        </addColumn>
+    </changeSet>
+
+</databaseChangeLog>

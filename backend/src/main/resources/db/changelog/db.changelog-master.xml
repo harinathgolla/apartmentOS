@@ -36,5 +36,7 @@
     <include file="db/changelog/changes/021-meter-readings-meter-id.xml" relativeToChangelogFile="false"/>
     <include file="db/changelog/changes/022-common-meter-maintenance-split.xml" relativeToChangelogFile="false"/>
     <include file="db/changelog/changes/023-flat-nominal-charges.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/024-lease-upfront-charge.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/025-liability-settlements.xml" relativeToChangelogFile="false"/>
 
 </databaseChangeLog>

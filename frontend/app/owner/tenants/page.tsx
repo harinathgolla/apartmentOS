@@ -31,7 +31,12 @@ type Tenancy = {
   agreementStart?: string; agreementEnd?: string;
   frequency?: string; dueDay?: number;
   tenancyType?: string; maintenanceAmount?: number;
+  leaseUpfrontAmount?: number; leaseUpfrontCollected?: number; leaseUpfrontNotes?: string | null;
   active: boolean;
+};
+type MeterCfg = {
+  id: number; flatId?: number | null; label?: string | null; serialNo?: string | null;
+  utilityType: "ELECTRICITY" | "WATER"; scope: "PUBLIC" | "PRIVATE";
 };
 type Filter = "active" | "inactive" | "all";
 
@@ -48,6 +53,7 @@ export default function TenantsPage() {
   const [selectedAptId, setSelectedAptId] = useState<number | null>(null);
   const [tenants, setTenants] = useState<Tenancy[]>([]);
   const [flats, setFlats] = useState<Flat[]>([]);
+  const [meters, setMeters] = useState<MeterCfg[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<Filter>("active");
   const [tenantModal, setTenantModal] = useState<
@@ -73,27 +79,33 @@ export default function TenantsPage() {
     if (!selectedAptId) {
       setTenants([]);
       setFlats([]);
+      setMeters([]);
       setLoading(false);
       return;
     }
     setLoading(true);
     try {
-      const [t, f] = await Promise.all([
+      const [t, f, m] = await Promise.all([
         api.get<Tenancy[]>("/api/owner/tenants", {
           params: { apartmentId: selectedAptId, all: filter !== "active" },
         }),
         api.get<Flat[]>("/api/owner/flats", {
           params: { apartmentId: selectedAptId },
         }),
+        api.get<MeterCfg[]>("/api/owner/meters", {
+          params: { apartmentId: selectedAptId },
+        }).catch(() => ({ data: [] })),
       ]);
       let rows = Array.isArray(t.data) ? t.data : [];
       if (filter === "active") rows = rows.filter((r) => r.active);
       if (filter === "inactive") rows = rows.filter((r) => !r.active);
       setTenants(rows);
       setFlats(Array.isArray(f.data) ? f.data : []);
+      setMeters(Array.isArray(m.data) ? m.data : []);
     } catch {
       setTenants([]);
       setFlats([]);
+      setMeters([]);
     } finally {
       setLoading(false);
     }
@@ -350,7 +362,16 @@ export default function TenantsPage() {
                         </div>
                       )}
                     </TableCell>
-                    <TableCell>{fmtINR(t.rentAmount)}</TableCell>
+                    <TableCell>
+                      <div className="font-medium">
+                        {fmtINR(num(t.rentAmount) + num(t.maintenanceAmount))}
+                      </div>
+                      {num(t.maintenanceAmount) > 0 && (
+                        <div className="text-xs text-muted-foreground">
+                          incl. {fmtINR(t.maintenanceAmount)} maint.
+                        </div>
+                      )}
+                    </TableCell>
                     <TableCell>
                       <span className="inline-flex items-center gap-1 text-xs">
                         <Repeat className="h-3 w-3 text-muted-foreground" />
@@ -419,7 +440,9 @@ export default function TenantsPage() {
         <TenantFormModal
           mode={tenantModal.mode}
           apartmentId={selectedAptId}
+          apartmentName={apartments.find((a) => a.id === selectedAptId)?.name}
           flats={flats}
+          meters={meters}
           tenant={tenantModal.mode === "edit" ? tenantModal.tenant : null}
           onClose={() => setTenantModal(null)}
           onDone={() => {
@@ -446,6 +469,11 @@ export default function TenantsPage() {
 }
 
 /* ─────────── helpers ─────────── */
+const num = (v: unknown) => {
+  const n = Number(v ?? 0);
+  return Number.isFinite(n) ? n : 0;
+};
+
 async function markInactive(t: Tenancy, reload: () => void) {
   if (
     !window.confirm(
@@ -685,11 +713,13 @@ function FlatFormModal({
    TENANT FORM MODAL — with frequency + due day
    ═══════════════════════════════════════════════════════════════════ */
 function TenantFormModal({
-  mode, apartmentId, flats, tenant, onClose, onDone,
+  mode, apartmentId, apartmentName, flats, meters, tenant, onClose, onDone,
 }: {
   mode: "create" | "edit";
   apartmentId: number;
+  apartmentName?: string;
   flats: Flat[];
+  meters: MeterCfg[];
   tenant: Tenancy | null;
   onClose: () => void;
   onDone: () => void;
@@ -710,7 +740,15 @@ function TenantFormModal({
     dueDay: tenant?.dueDay != null ? String(tenant.dueDay) : "5",
     tenancyType: tenant?.tenancyType ?? "RENTAL",
     maintenanceAmount: tenant?.maintenanceAmount != null ? String(tenant.maintenanceAmount) : "",
+    leaseUpfrontAmount: tenant?.leaseUpfrontAmount != null ? String(tenant.leaseUpfrontAmount) : "",
+    leaseUpfrontCollected: tenant?.leaseUpfrontCollected != null ? String(tenant.leaseUpfrontCollected) : "",
+    leaseUpfrontNotes: tenant?.leaseUpfrontNotes ?? "",
   });
+
+  const selectedFlat = flats.find((f) => String(f.id) === form.flatId);
+  const flatMeters = meters.filter((m) => m.flatId === selectedFlat?.id);
+  const selectedMeter = flatMeters[0];
+  const isLease = form.tenancyType === "LEASE";
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -756,6 +794,9 @@ function TenantFormModal({
           dueDay: form.dueDay ? Number(form.dueDay) : 5,
           tenancyType: form.tenancyType,
           maintenanceAmount: form.maintenanceAmount ? Number(form.maintenanceAmount) : null,
+          leaseUpfrontAmount: form.leaseUpfrontAmount ? Number(form.leaseUpfrontAmount) : null,
+          leaseUpfrontCollected: form.leaseUpfrontCollected ? Number(form.leaseUpfrontCollected) : null,
+          leaseUpfrontNotes: form.leaseUpfrontNotes.trim() || null,
         });
         toast.success("Tenant updated");
       } else {
@@ -774,6 +815,9 @@ function TenantFormModal({
           dueDay: form.dueDay ? Number(form.dueDay) : 5,
           tenancyType: form.tenancyType,
           maintenanceAmount: form.maintenanceAmount ? Number(form.maintenanceAmount) : null,
+          leaseUpfrontAmount: form.leaseUpfrontAmount ? Number(form.leaseUpfrontAmount) : null,
+          leaseUpfrontCollected: form.leaseUpfrontCollected ? Number(form.leaseUpfrontCollected) : null,
+          leaseUpfrontNotes: form.leaseUpfrontNotes.trim() || null,
         });
         toast.success("Tenant onboarded");
       }
@@ -876,9 +920,12 @@ function TenantFormModal({
                   setForm({ ...form, flatId: e.target.value })
                 }
               >
-                <option value="">Select flat</option>
+                <option value="">
+                  Select flat{apartmentName ? ` in ${apartmentName}` : ""}
+                </option>
                 {flats.map((f) => (
                   <option key={f.id} value={f.id}>
+                    {apartmentName ? `${apartmentName} · ` : ""}
                     {f.flatNo}
                     {f.floor != null ? ` — Floor ${f.floor}` : ""}
                   </option>
@@ -886,6 +933,37 @@ function TenantFormModal({
               </select>
             )}
           </div>
+
+          {/* ── Meter + nominal (read-only, from flat) ── */}
+          {selectedFlat && (
+            <>
+              <div>
+                <Label>Meter serial no.</Label>
+                <div className="h-10 flex items-center rounded-lg border bg-muted/40 px-3 text-sm">
+                  {selectedMeter?.serialNo || selectedFlat.meterSerialNo || "No meter assigned"}
+                  {selectedMeter && (
+                    <span className="ml-2 text-xs text-muted-foreground">
+                      ({selectedMeter.utilityType.toLowerCase()})
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Assigned to this flat in apartment setup.
+                </p>
+              </div>
+              <div>
+                <Label>Nominal utility (from flat)</Label>
+                <div className="h-10 flex items-center gap-3 rounded-lg border bg-muted/40 px-3 text-sm">
+                  <span>Elec: {selectedFlat.nominalElectricityAmount != null ? fmtINR(selectedFlat.nominalElectricityAmount) : "—"}</span>
+                  <span className="text-muted-foreground">·</span>
+                  <span>Water: {selectedFlat.nominalWaterAmount != null ? fmtINR(selectedFlat.nominalWaterAmount) : "—"}</span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Fixed monthly charge when the flat has no meter.
+                </p>
+              </div>
+            </>
+          )}
 
           {/* ── Rent terms ── */}
           <div className="md:col-span-2 pt-2">
@@ -974,6 +1052,38 @@ function TenantFormModal({
               Stated separately in the agreement; collected monthly.
             </p>
           </div>
+
+          {/* ── Lease upfront (one-time liability, not rent) ── */}
+          {isLease && (
+            <>
+              <div className="md:col-span-2 pt-2">
+                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  Lease advance (one-time, refundable — not rent)
+                </div>
+              </div>
+              <div>
+                <Label>Upfront amount (₹)</Label>
+                <Input type="number" value={form.leaseUpfrontAmount}
+                  onChange={(e) => setForm({ ...form, leaseUpfrontAmount: e.target.value })}
+                  placeholder="e.g. 3-month advance" />
+              </div>
+              <div>
+                <Label>Already collected (₹)</Label>
+                <Input type="number" value={form.leaseUpfrontCollected}
+                  onChange={(e) => setForm({ ...form, leaseUpfrontCollected: e.target.value })}
+                  placeholder="0" />
+              </div>
+              <div className="md:col-span-2">
+                <Label>Label / notes</Label>
+                <Input value={form.leaseUpfrontNotes}
+                  onChange={(e) => setForm({ ...form, leaseUpfrontNotes: e.target.value })}
+                  placeholder="3-month lease advance" />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Tracked as a refundable liability on the Liabilities page — never counted as rent.
+                </p>
+              </div>
+            </>
+          )}
 
           {/* ── Agreement dates ── */}
           <div className="md:col-span-2 pt-2">

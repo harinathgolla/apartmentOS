@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   Building2, LayoutDashboard, Receipt, Wallet, Droplets,
   Users, LineChart, Settings, Bell, FileSpreadsheet,
-  Gauge, Menu, X,
+  Gauge, Menu, X, ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -13,6 +13,7 @@ const items = [
   { href: "/owner",             label: "Dashboard",   icon: LayoutDashboard },
   { href: "/owner/tenants",     label: "Tenants",     icon: Users },
   { href: "/owner/rent",        label: "Rent",        icon: Receipt },
+  { href: "/owner/liabilities", label: "Liabilities", icon: ShieldCheck },
   { href: "/owner/utilities",   label: "Utilities",   icon: Droplets },
   { href: "/owner/meters",      label: "Meters",      icon: Gauge },
   { href: "/owner/expenses",    label: "Expenses",    icon: Wallet },
