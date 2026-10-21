@@ -103,7 +103,7 @@ export default function RentPage() {
     try {
       const [tenants, flats, rent, meter, meterCfg] = await Promise.all([
         // Include past/old tenancies so historical months show that agreement's rent.
-        api.get<Tenancy[]>("/api/owner/tenants", { params: { apartmentId: selectedAptId, all: true } }),
+        api.get<any>("/api/owner/tenants", { params: { apartmentId: selectedAptId, all: true, size: 500 } }),
         api.get<Flat[]>("/api/owner/flats", { params: { apartmentId: selectedAptId } }),
         api.get<RentRecord[]>("/api/owner/rent", { params: { year, month, apartmentId: selectedAptId } }),
         api.get<MeterReading[]>("/api/owner/meter", { params: { year, month } }).catch(() => ({ data: [] })),
@@ -114,7 +114,11 @@ export default function RentPage() {
       const ms = Array.isArray(meter.data) ? meter.data : [];
       // Keep a tenancy if it is active OR it has a record for the selected period,
       // so an old agreement still surfaces with its own (historical) rent.
-      const allTenancies = Array.isArray(tenants.data) ? tenants.data : [];
+      // Endpoint returns a Spring Page; unwrap defensively, fall back to a plain array.
+      const td = tenants.data as any;
+      const allTenancies: Tenancy[] = Array.isArray(td)
+        ? td
+        : Array.isArray(td?.content) ? td.content : [];
       const ts = allTenancies.filter(
         (t) => t.active || rs.some((r) => r.tenancyId === t.id)
       );
