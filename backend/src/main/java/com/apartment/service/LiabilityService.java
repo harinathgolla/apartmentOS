@@ -141,6 +141,19 @@ public class LiabilityService {
         return settlements.findByTenancyIdOrderBySettledDateDescIdDesc(tenancyId);
     }
 
+    /** Paged settlement history for one tenancy. */
+    public org.springframework.data.domain.Page<LiabilitySettlement> pageHistory(
+            Long aptId, Long tenancyId, int page, int size) {
+        Tenancy t = tenancies.findById(tenancyId)
+                .orElseThrow(() -> new IllegalArgumentException("Tenancy not found"));
+        if (!t.getApartmentId().equals(aptId))
+            throw new IllegalArgumentException("Tenancy not in this apartment");
+        return settlements.findByTenancyIdOrderBySettledDateDescIdDesc(
+                tenancyId,
+                org.springframework.data.domain.PageRequest.of(
+                        Math.max(page, 0), Math.min(Math.max(size, 1), 200)));
+    }
+
     private LiabilitySettlement.Kind parseKind(String s) {
         if (s == null || s.isBlank()) return LiabilitySettlement.Kind.SECURITY_DEPOSIT;
         try { return LiabilitySettlement.Kind.valueOf(s.toUpperCase()); }

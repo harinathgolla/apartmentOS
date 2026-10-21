@@ -52,8 +52,11 @@ public class LiabilityController {
 
     /** Settlement history for one tenancy. */
     @GetMapping("/tenancy/{tenancyId}/history")
-    public List<LiabilitySettlement> history(@PathVariable Long tenancyId,
-                                             @RequestParam(required = false) Long apartmentId) {
-        return liabilitySvc.history(requireApartmentId(apartmentId), tenancyId);
+    public org.springframework.data.domain.Page<LiabilitySettlement> history(
+            @PathVariable Long tenancyId,
+            @RequestParam(required = false) Long apartmentId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "25") int size) {
+        return liabilitySvc.pageHistory(requireApartmentId(apartmentId), tenancyId, page, size);
     }
 }
