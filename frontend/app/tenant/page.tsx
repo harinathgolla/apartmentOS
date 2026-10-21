@@ -9,6 +9,7 @@ import { PageHeader } from "@/components/dashboard/page-header";
 import { KpiCard } from "@/components/dashboard/kpi-card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Pagination } from "@/components/ui/pagination";
 import { api, getMe } from "@/lib/api";
 import { fmtINR } from "@/lib/utils";
 
@@ -17,18 +18,33 @@ export default function TenantDashboard() {
   const [me, setMe] = useState<any>(null);
   const [rent, setRent] = useState<any[]>([]);
   const [meter, setMeter] = useState<any[]>([]);
+  const [page, setPage] = useState(0);
+  const [size, setSize] = useState<any>(25);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalElements, setTotalElements] = useState(0);
+  const [loadingRent, setLoadingRent] = useState(false);
 
   useEffect(() => {
     const m = getMe();
     if (!m) { r.push("/login"); return; }
     setMe(m);
-    // Endpoint now returns a Spring Page; unwrap defensively.
-    api.get<any>("/api/tenant/rent").then((x) => {
-      const d = x.data;
-      setRent(Array.isArray(d) ? d : Array.isArray(d?.content) ? d.content : []);
-    }).catch(()=>{});
     api.get("/api/tenant/meter").then(x => setMeter(x.data)).catch(()=>{});
   }, [r]);
+
+  useEffect(() => {
+    if (!me) return;
+    setLoadingRent(true);
+    api.get<any>("/api/tenant/rent", { params: { page, size } })
+      .then((x) => {
+        const d = x.data;
+        const content = Array.isArray(d) ? d : Array.isArray(d?.content) ? d.content : [];
+        setRent(content);
+        setTotalPages(d?.totalPages ?? 0);
+        setTotalElements(d?.totalElements ?? content.length);
+      })
+      .catch(()=>{ setRent([]); })
+      .finally(() => setLoadingRent(false));
+  }, [me, page, size]);
 
   const pending = rent.filter(x => !x.paid);
   const totalDue = pending.reduce((s, x) => s + Number(x.totalCollected || 0), 0);
@@ -77,10 +93,19 @@ export default function TenantDashboard() {
                   </TableRow>
                 ))}
                 {rent.length === 0 && (
-                  <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No rent records yet</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">{loadingRent ? "Loading…" : "No rent records yet"}</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>
+            <Pagination
+              page={page}
+              size={size}
+              totalPages={totalPages}
+              totalElements={totalElements}
+              loading={loadingRent}
+              onPageChange={setPage}
+              onSizeChange={setSize}
+            />
           </CardContent>
         </Card>
 

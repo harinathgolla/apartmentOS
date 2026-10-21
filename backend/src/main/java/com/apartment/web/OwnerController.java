@@ -110,15 +110,22 @@ public class OwnerController {
     }
 
     /** By default, returns active tenants. Pass ?all=true to include inactive ones. */
+    /** status = active (default) | inactive | all */
     @GetMapping("/tenants")
     public org.springframework.data.domain.Page<Tenancy> tenants(
             @RequestParam(required = false) Long apartmentId,
             @RequestParam(required = false, defaultValue = "false") boolean all,
+            @RequestParam(required = false) String status,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "25") int size) {
         Long aptId = apartmentId != null ? apartmentId : primaryApartmentIdOrNull();
         if (aptId == null) return org.springframework.data.domain.Page.empty();
-        return all ? tenantSvc.pageAll(aptId, page, size) : tenantSvc.pageActive(aptId, page, size);
+        String s = status != null ? status : (all ? "all" : "active");
+        return switch (s) {
+            case "inactive" -> tenantSvc.pageInactive(aptId, page, size);
+            case "all" -> tenantSvc.pageAll(aptId, page, size);
+            default -> tenantSvc.pageActive(aptId, page, size);
+        };
     }
 
     @GetMapping("/tenants/{id}")

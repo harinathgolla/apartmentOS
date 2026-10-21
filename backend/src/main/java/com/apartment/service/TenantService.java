@@ -104,6 +104,10 @@ public class TenantService {
         return tenancies.findByApartmentIdOrderByActiveDescIdDesc(aptId, pageRequest(page, size));
     }
 
+    public org.springframework.data.domain.Page<Tenancy> pageInactive(Long aptId, int page, int size) {
+        return tenancies.findByApartmentIdAndActiveFalseOrderByIdDesc(aptId, pageRequest(page, size));
+    }
+
     private static org.springframework.data.domain.PageRequest pageRequest(int page, int size) {
         return org.springframework.data.domain.PageRequest.of(
                 Math.max(page, 0), Math.min(Math.max(size, 1), 200));

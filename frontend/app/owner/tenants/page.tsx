@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import { Pagination, type PageSize } from "@/components/ui/pagination";
 import { api } from "@/lib/api";
 import { DeleteButton } from "@/components/ui/delete-button";
 import { useConfirm } from "@/components/ui/confirm-dialog";
@@ -59,6 +60,10 @@ export default function TenantsPage() {
   const [meters, setMeters] = useState<MeterCfg[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<Filter>("active");
+  const [page, setPage] = useState(0);
+  const [size, setSize] = useState<PageSize>(25);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalElements, setTotalElements] = useState(0);
   const [tenantModal, setTenantModal] = useState<
     { mode: "create" } | { mode: "edit"; tenant: Tenancy } | null
   >(null);
@@ -91,7 +96,7 @@ export default function TenantsPage() {
     try {
       const [t, f, m] = await Promise.all([
         api.get<any>("/api/owner/tenants", {
-          params: { apartmentId: selectedAptId, all: filter !== "active" },
+          params: { apartmentId: selectedAptId, status: filter, page, size },
         }),
         api.get<Flat[]>("/api/owner/flats", {
           params: { apartmentId: selectedAptId },
@@ -102,12 +107,12 @@ export default function TenantsPage() {
       ]);
       // The endpoint now returns a Spring Page; fall back to a plain array too.
       const pageData = t.data as any;
-      let rows: Tenancy[] = Array.isArray(pageData)
+      const rows: Tenancy[] = Array.isArray(pageData)
         ? pageData
         : Array.isArray(pageData?.content) ? pageData.content : [];
-      if (filter === "active") rows = rows.filter((r) => r.active);
-      if (filter === "inactive") rows = rows.filter((r) => !r.active);
       setTenants(rows);
+      setTotalPages(pageData?.totalPages ?? 0);
+      setTotalElements(pageData?.totalElements ?? rows.length);
       setFlats(Array.isArray(f.data) ? f.data : []);
       setMeters(Array.isArray(m.data) ? m.data : []);
     } catch {
@@ -117,9 +122,12 @@ export default function TenantsPage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedAptId, filter]);
+  }, [selectedAptId, filter, page, size]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Reset to first page whenever the apartment or status filter changes.
+  useEffect(() => { setPage(0); }, [selectedAptId, filter]);
 
   useEffect(() => {
     if (flats.length === 0 && selectedAptId) setShowFlats(true);
@@ -454,6 +462,16 @@ export default function TenantsPage() {
               })}
             </TableBody>
           </Table>
+
+          <Pagination
+            page={page}
+            size={size}
+            totalPages={totalPages}
+            totalElements={totalElements}
+            loading={loading}
+            onPageChange={setPage}
+            onSizeChange={setSize}
+          />
         </CardContent>
       </Card>
 

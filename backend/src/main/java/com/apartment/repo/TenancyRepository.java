@@ -9,6 +9,8 @@ public interface TenancyRepository extends JpaRepository<Tenancy, Long> {
 
     Page<Tenancy> findByApartmentIdAndActiveTrueOrderByIdDesc(Long apartmentId, Pageable pageable);
 
+    Page<Tenancy> findByApartmentIdAndActiveFalseOrderByIdDesc(Long apartmentId, Pageable pageable);
+
     Page<Tenancy> findByApartmentIdOrderByActiveDescIdDesc(Long apartmentId, Pageable pageable);
     Optional<Tenancy> findByTenantUserIdAndActiveTrue(Long tenantUserId);
     List<Tenancy> findByFlatIdAndActiveTrue(Long flatId);

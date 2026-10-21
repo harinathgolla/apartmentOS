@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import { Pagination } from "@/components/ui/pagination";
 import { api } from "@/lib/api";
 import { fmtINR } from "@/lib/utils";
 import { toast } from "sonner";
@@ -33,6 +34,10 @@ export default function PastTenantsPage() {
   const [flats, setFlats] = useState<Flat[]>([]);
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState<number | null>(null);
+  const [page, setPage] = useState(0);
+  const [size, setSize] = useState<any>(25);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalElements, setTotalElements] = useState(0);
 
   useEffect(() => {
     api.get<Apartment[]>("/api/owner/apartments")
@@ -50,7 +55,7 @@ export default function PastTenantsPage() {
     try {
       const [t, f] = await Promise.all([
         api.get<any>("/api/owner/tenants", {
-          params: { apartmentId: selectedAptId, all: true },
+          params: { apartmentId: selectedAptId, all: true, page, size },
         }),
         api.get<Flat[]>("/api/owner/flats", { params: { apartmentId: selectedAptId } }),
       ]);
@@ -60,13 +65,15 @@ export default function PastTenantsPage() {
         ? pageData
         : Array.isArray(pageData?.content) ? pageData.content : [];
       setRows(all.filter((x) => !x.active));
+      setTotalPages(pageData?.totalPages ?? 0);
+      setTotalElements(pageData?.totalElements ?? all.length);
       setFlats(Array.isArray(f.data) ? f.data : []);
     } catch {
       setRows([]); setFlats([]);
     } finally {
       setLoading(false);
     }
-  }, [selectedAptId]);
+  }, [selectedAptId, page, size]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -201,6 +208,16 @@ export default function PastTenantsPage() {
               })}
             </TableBody>
           </Table>
+
+          <Pagination
+            page={page}
+            size={size}
+            totalPages={totalPages}
+            totalElements={totalElements}
+            loading={loading}
+            onPageChange={setPage}
+            onSizeChange={setSize}
+          />
         </CardContent>
       </Card>
     </>
