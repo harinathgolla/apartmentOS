@@ -90,7 +90,7 @@ export default function TenantsPage() {
     setLoading(true);
     try {
       const [t, f, m] = await Promise.all([
-        api.get<Tenancy[]>("/api/owner/tenants", {
+        api.get<any>("/api/owner/tenants", {
           params: { apartmentId: selectedAptId, all: filter !== "active" },
         }),
         api.get<Flat[]>("/api/owner/flats", {
@@ -100,7 +100,11 @@ export default function TenantsPage() {
           params: { apartmentId: selectedAptId },
         }).catch(() => ({ data: [] })),
       ]);
-      let rows = Array.isArray(t.data) ? t.data : [];
+      // The endpoint now returns a Spring Page; fall back to a plain array too.
+      const pageData = t.data as any;
+      let rows: Tenancy[] = Array.isArray(pageData)
+        ? pageData
+        : Array.isArray(pageData?.content) ? pageData.content : [];
       if (filter === "active") rows = rows.filter((r) => r.active);
       if (filter === "inactive") rows = rows.filter((r) => !r.active);
       setTenants(rows);

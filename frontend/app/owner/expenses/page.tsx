@@ -1,22 +1,26 @@
 "use client";
-import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { api } from "@/lib/api";
+import { Pagination } from "@/components/ui/pagination";
+import { usePagedQuery } from "@/lib/use-paged-query";
 import { fmtINR } from "@/lib/utils";
 
-export default function ExpensesPage() {
-  const [rows, setRows] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+type Expense = {
+  id: number;
+  expenseDate: string;
+  category: string;
+  amount: number;
+  vendor?: string | null;
+  source?: string | null;
+};
 
-  useEffect(() => {
-    api.get("/api/owner/expenses")
-      .then((r) => setRows(Array.isArray(r.data) ? r.data : []))
-      .catch(() => setRows([]))
-      .finally(() => setLoading(false));
-  }, []);
+export default function ExpensesPage() {
+  const {
+    rows, page, size, totalPages, totalElements, loading, error,
+    setPage, setSize,
+  } = usePagedQuery<Expense>("/api/owner/expenses");
 
   return (
     <>
@@ -31,7 +35,7 @@ export default function ExpensesPage() {
             <TableBody>
               {rows.length === 0 && (
                 <TableRow><TableCell colSpan={5} className="text-center py-10 text-muted-foreground">
-                  {loading ? "Loading…" : "No expenses yet"}
+                  {loading ? "Loading…" : error ?? "No expenses yet"}
                 </TableCell></TableRow>
               )}
               {rows.map((r) => {
@@ -56,6 +60,16 @@ export default function ExpensesPage() {
               })}
             </TableBody>
           </Table>
+
+          <Pagination
+            page={page}
+            size={size}
+            totalPages={totalPages}
+            totalElements={totalElements}
+            loading={loading}
+            onPageChange={setPage}
+            onSizeChange={setSize}
+          />
         </CardContent>
       </Card>
     </>

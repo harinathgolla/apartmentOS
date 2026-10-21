@@ -199,6 +199,14 @@ public class RentService {
         return repo.findByTenancyIdOrderByYearDescIdDesc(tenancyId);
     }
 
+    /** Paged rent history for the tenant portal. */
+    public org.springframework.data.domain.Page<RentRecord> pageForTenant(Long tenancyId, int page, int size) {
+        return repo.findByTenancyIdOrderByYearDescMonthDescIdDesc(
+                tenancyId,
+                org.springframework.data.domain.PageRequest.of(
+                        Math.max(page, 0), Math.min(Math.max(size, 1), 200)));
+    }
+
     public List<RentRecord> forApartmentYear(Long aptId, Integer year) {
         return repo.findByApartmentIdAndYear(aptId, year);
     }

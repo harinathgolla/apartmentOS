@@ -22,7 +22,11 @@ export default function TenantDashboard() {
     const m = getMe();
     if (!m) { r.push("/login"); return; }
     setMe(m);
-    api.get("/api/tenant/rent").then(x => setRent(x.data)).catch(()=>{});
+    // Endpoint now returns a Spring Page; unwrap defensively.
+    api.get<any>("/api/tenant/rent").then((x) => {
+      const d = x.data;
+      setRent(Array.isArray(d) ? d : Array.isArray(d?.content) ? d.content : []);
+    }).catch(()=>{});
     api.get("/api/tenant/meter").then(x => setMeter(x.data)).catch(()=>{});
   }, [r]);
 

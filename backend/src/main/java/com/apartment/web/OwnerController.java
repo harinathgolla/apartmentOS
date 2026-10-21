@@ -111,11 +111,14 @@ public class OwnerController {
 
     /** By default, returns active tenants. Pass ?all=true to include inactive ones. */
     @GetMapping("/tenants")
-    public List<Tenancy> tenants(@RequestParam(required = false) Long apartmentId,
-                                 @RequestParam(required = false, defaultValue = "false") boolean all) {
+    public org.springframework.data.domain.Page<Tenancy> tenants(
+            @RequestParam(required = false) Long apartmentId,
+            @RequestParam(required = false, defaultValue = "false") boolean all,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "25") int size) {
         Long aptId = apartmentId != null ? apartmentId : primaryApartmentIdOrNull();
-        if (aptId == null) return List.of();
-        return all ? tenantSvc.allForApartment(aptId) : tenantSvc.active(aptId);
+        if (aptId == null) return org.springframework.data.domain.Page.empty();
+        return all ? tenantSvc.pageAll(aptId, page, size) : tenantSvc.pageActive(aptId, page, size);
     }
 
     @GetMapping("/tenants/{id}")
@@ -214,9 +217,12 @@ public class OwnerController {
         return expenseSvc.create(ctx().userId(), req);
     }
     @GetMapping("/expenses")
-    public List<Expense> expenses() {
+    public org.springframework.data.domain.Page<Expense> expenses(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "25") int size) {
         Long aptId = primaryApartmentIdOrNull();
-        return aptId == null ? List.of() : expenseSvc.forApartment(aptId);
+        if (aptId == null) return org.springframework.data.domain.Page.empty();
+        return expenseSvc.pageForApartment(aptId, page, size);
     }
 
     /* ─────────── Dashboard ─────────── */

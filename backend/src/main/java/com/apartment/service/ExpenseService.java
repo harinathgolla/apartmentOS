@@ -3,6 +3,8 @@ import com.apartment.domain.Expense;
 import com.apartment.dto.AuthDtos.ExpenseRequest;
 import com.apartment.repo.ExpenseRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import java.util.List;
 
@@ -18,4 +20,9 @@ public class ExpenseService {
                 .createdBy(userId).build());
     }
     public List<Expense> forApartment(Long aptId) { return repo.findByApartmentIdOrderByExpenseDateDesc(aptId); }
+
+    public Page<Expense> pageForApartment(Long aptId, int page, int size) {
+        return repo.findByApartmentIdOrderByExpenseDateDescIdDesc(
+                aptId, PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 200)));
+    }
 }

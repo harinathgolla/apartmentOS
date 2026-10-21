@@ -35,9 +35,12 @@ public class TenantController {
     }
 
     @GetMapping("/rent")
-    public List<RentRecord> myRent() {
+    public org.springframework.data.domain.Page<RentRecord> myRent(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "25") int size) {
         Tenancy t = tenancyOrNull();
-        return t == null ? List.of() : rentSvc.forTenant(t.getId());
+        if (t == null) return org.springframework.data.domain.Page.empty();
+        return rentSvc.pageForTenant(t.getId(), page, size);
     }
 
     @GetMapping("/meter")
