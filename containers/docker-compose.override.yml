@@ -7,4 +7,4 @@ services:
 
   # Expose mailhog by default in dev
   mailhog:
-    profiles: [dev]   # always on in dev
+    profiles: [dev,full]   # always on in dev

@@ -1,7 +1,7 @@
 # ═══════════════════════════════════════════════════════════
-# Stage 1 — build with Maven + JDK 21
+# Stage 1 — build with Maven + JDK 25
 # ═══════════════════════════════════════════════════════════
-FROM maven:3.9-eclipse-temurin-21 AS build
+FROM maven:3.9-eclipse-temurin-25 AS build
 WORKDIR /workspace
 
 # Cache dependencies first
@@ -15,7 +15,7 @@ RUN mvn -B -q clean package -DskipTests
 # ═══════════════════════════════════════════════════════════
 # Stage 2 — runtime (small JRE image)
 # ═══════════════════════════════════════════════════════════
-FROM eclipse-temurin:21-jre-alpine
+FROM eclipse-temurin:25-jre-alpine
 WORKDIR /app
 
 RUN apk add --no-cache tzdata curl && \

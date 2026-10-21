@@ -61,7 +61,7 @@ services:
       - "${MAILHOG_UI_PORT}:8025"
     networks:
       - apartment-net
-    profiles: ["dev"]   # only runs in dev profile
+    profiles: ["dev","full"]   # only runs in dev profile
   
   # ═══════════════════════════════════════════════════════
   # MailHog — catch all outgoing email in dev
@@ -114,16 +114,20 @@ services:
     environment:
       # docker = DB/host wiring; mock-oauth = route Google login to local mock-oauth2 (dev)
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-docker,mock-oauth}
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      SPRING_DATASOURCE_URL: jdbc:mysql://apt-mysql:3306/${MYSQL_DATABASE}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
       SPRING_DATASOURCE_USERNAME: ${MYSQL_USER}
       SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD}
-      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_HOST: apt-redis
       SPRING_DATA_REDIS_PORT: 6379
       SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD}
-      SPRING_MAIL_HOST: mailhog
+      SPRING_MAIL_HOST: apt-mailhog
       SPRING_MAIL_PORT: 1025
-      # Backend runs in Docker -> reach the mock OAuth issuer via host gateway
-      MOCK_OAUTH_ISSUER: http://host.docker.internal:9000/google
+      # Backend runs in Docker; the ISSUER must be browser-reachable (the browser
+      # is redirected to {issuer}/authorize, and host.docker.internal does not
+      # resolve on the Windows host). localhost:9000 is published by the
+      # mock-oauth container, and `extra_hosts` below maps localhost -> host
+      # gateway so the server-side token/JWKS calls also work.
+      MOCK_OAUTH_ISSUER: http://localhost:9000/google
       JWT_SECRET: ${JWT_SECRET}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
@@ -133,6 +137,11 @@ services:
       APP_FRONTEND_URL: http://localhost:${FRONTEND_PORT}
     ports:
       - "${BACKEND_PORT}:8080"
+    # The OAuth issuer is http://localhost:9000/google (browser-reachable).
+    # Inside the container "localhost" is the container itself, so point it at
+    # the host gateway, where mock-oauth's published port 9000 is reachable.
+    extra_hosts:
+      - "localhost:host-gateway"
     depends_on:
       mysql:
         condition: service_healthy
