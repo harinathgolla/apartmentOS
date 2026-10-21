@@ -1,5 +1,8 @@
 server:
   port: 8080
+  # Honour X-Forwarded-* from nginx so OAuth {baseUrl} resolves to the public
+  # origin (http://localhost) instead of the backend's internal host:8080.
+  forward-headers-strategy: framework
 
 spring:
   threads:

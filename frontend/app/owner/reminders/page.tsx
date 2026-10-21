@@ -87,7 +87,7 @@ export default function RemindersPage() {
                   Connect your mail account once so reminders go out from your own address.
                 </p>
                 <Button variant="outline" className="w-full" asChild>
-                  <a href="http://localhost:8080/oauth2/authorization/google">Connect mail account</a>
+                  <a href="/oauth2/authorization/google">Connect mail account</a>
                 </Button>
               </>
             )}

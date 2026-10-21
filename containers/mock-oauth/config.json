@@ -14,7 +14,9 @@
             "email": "owner@saienclave.test",
             "email_verified": true,
             "name": "Mock Owner",
-            "picture": "https://i.pravatar.cc/150?img=12"
+            "picture": "https://i.pravatar.cc/150?img=12",
+            "aud": "mock-client-id",
+            "azp": "mock-client-id"
           }
         }
       ]

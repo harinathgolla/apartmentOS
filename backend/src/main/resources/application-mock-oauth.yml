@@ -10,24 +10,27 @@ spring:
             client-secret: mock-client-secret
             authorization-grant-type: authorization_code
             redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+            # mock-oauth2-server REQUIRES "openid" in the scope (it rejects the
+            # authorize request otherwise: "the scope must include an openid value").
+            # With openid, Spring uses the OIDC provider, which validates the ID
+            # token's iss/aud/azp. The mock server's token includes "aud" thanks to
+            # the added claim in containers/mock-oauth/config.json.
             scope:
               - openid
               - email
               - profile
         provider:
           google:
-            # No issuer-uri here on purpose: mock-oauth2-server derives its
-            # advertised "issuer" from the request Host header, so discovery over
-            # an internal service name would disagree with the browser-facing URL.
-            # Endpoints are therefore declared explicitly, split in two:
-            #   * browser-facing  -> MUST be resolvable by the user's browser
-            #   * server-facing   -> MUST be resolvable from inside the backend container
-            issuer: ${MOCK_OAUTH_ISSUER:http://localhost:9000/google}
+            # Let Spring do OIDC discovery against the mock server over the
+            # container network (mock-oauth:8080). Discovery there returns a
+            # fully self-consistent document (issuer + token + jwks + userinfo
+            # all on the same host), so no URLs are hand-assembled.
+            #
+            # The ONLY override is the authorization endpoint: the BROWSER is
+            # redirected there, and mock-oauth:8080 is not resolvable from the
+            # host. localhost:9000 is the host-published port for mock-oauth.
+            issuer-uri: ${MOCK_OAUTH_ISSUER_URI:http://mock-oauth:8080/google}
             authorization-uri: ${MOCK_OAUTH_AUTHORIZATION_URI:http://localhost:9000/google/authorize}
-            token-uri: ${MOCK_OAUTH_TOKEN_URI:http://mock-oauth:8080/google/token}
-            jwk-set-uri: ${MOCK_OAUTH_JWK_SET_URI:http://mock-oauth:8080/google/jwks}
-            user-info-uri: ${MOCK_OAUTH_USER_INFO_URI:http://mock-oauth:8080/google/userinfo}
-            user-name-attribute: sub
   mail:
     # Default = localhost (host runs -> MailHog on localhost:1025).
     # docker-compose overrides SPRING_MAIL_HOST=mailhog / PORT=1025 for the container.

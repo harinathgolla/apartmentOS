@@ -72,7 +72,7 @@ export default function ProfilePage() {
                 </span>
               </div>
               <a
-                href={`${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080"}/oauth2/authorization/google`}
+                href="/oauth2/authorization/google"
                 className="rounded-lg border px-3 py-1.5 text-sm hover:bg-accent"
               >
                 {me?.googleConnected ? "Reconnect" : "Connect mail account"}
