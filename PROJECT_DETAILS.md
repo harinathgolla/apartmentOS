@@ -49,7 +49,7 @@ apartment-saas/
 │   ├── pom.xml
 │   └── src/main/
 │       ├── java/com/apartment/**
-│       └── resources/db/changelog/     # Liquibase master + 23 changesets
+│       └── resources/db/changelog/     # Liquibase master + 26 changesets
 ├── frontend/                           # Next.js 14 (App Router)
 │   ├── app/** components/** lib/**
 │   └── package.json / tsconfig.json / tailwind.config.ts
@@ -96,7 +96,7 @@ web/        Auth, Owner, Meter, Tenant, Pnl, Import, UtilityBill, CommonMeter,
 
 ---
 
-## 5. Database Schema (Liquibase) — 23 changesets
+## 5. Database Schema (Liquibase) — 26 changesets
 
 Master: `backend/src/main/resources/db/changelog/db.changelog-master.xml`
 
