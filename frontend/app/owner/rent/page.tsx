@@ -16,6 +16,8 @@ import {
 } from "@/components/ui/table";
 import { api } from "@/lib/api";
 import { DeleteButton } from "@/components/ui/delete-button";
+import { InlineLink } from "@/components/ui/inline-link";
+import { QuickFlatModal, type QuickFlat } from "@/components/owner/quick-flat-modal";
 import { fmtINR } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -84,6 +86,9 @@ export default function RentPage() {
   const [collectFor, setCollectFor] = useState<Row | null>(null);
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkMode, setBulkMode] = useState("CASH");
+  // Inline edit popups so the owner never has to leave rent collection.
+  const [flatEdit, setFlatEdit] = useState<QuickFlat | null>(null);
+  const [tenantEdit, setTenantEdit] = useState<Tenancy | null>(null);
 
   /* Load apartments */
   useEffect(() => {
@@ -338,14 +343,28 @@ export default function RentPage() {
                 const isPaid = row.existing?.paid === true;
                 return (
                   <TableRow key={row.tenancy.id} className={isPaid ? "" : ""}>
-                    <TableCell className="font-medium">{row.tenancy.tenantName}</TableCell>
+                    <TableCell className="font-medium">
+                      <InlineLink
+                        onClick={() => setTenantEdit(row.tenancy)}
+                        title="Edit this tenant"
+                      >
+                        {row.tenancy.tenantName}
+                      </InlineLink>
+                    </TableCell>
                     <TableCell>
                       {row.flat ? (
-                        <span className="inline-flex items-center gap-1">
+                        <InlineLink
+                          onClick={() => setFlatEdit(row.flat as QuickFlat)}
+                          title="Edit this flat"
+                        >
                           <Home className="h-3 w-3 text-muted-foreground" />
                           {row.flat.flatNo}
-                        </span>
-                      ) : `#${row.tenancy.flatId}`}
+                        </InlineLink>
+                      ) : (
+                        <InlineLink muted title="Flat not found">
+                          #{row.tenancy.flatId}
+                        </InlineLink>
+                      )}
                     </TableCell>
                     <TableCell>{fmtINR(row.tenancy.rentAmount)}</TableCell>
                     <TableCell>{water ? fmtINR(water) : "—"}</TableCell>
@@ -421,6 +440,23 @@ export default function RentPage() {
         />
       )}
 
+      {flatEdit && (
+        <QuickFlatModal
+          flat={flatEdit}
+          onClose={() => setFlatEdit(null)}
+          onDone={() => { setFlatEdit(null); load(); }}
+        />
+      )}
+
+      {tenantEdit && selectedAptId && (
+        <QuickTenantModal
+          tenancy={tenantEdit}
+          flats={rows.map((r) => r.flat).filter(Boolean) as Flat[]}
+          onClose={() => setTenantEdit(null)}
+          onDone={() => { setTenantEdit(null); load(); }}
+        />
+      )}
+
       {bulkOpen && (
         <BulkCollectModal
           count={rows.filter((r) => !r.existing?.paid).length}
@@ -433,6 +469,133 @@ export default function RentPage() {
         />
       )}
     </>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Quick tenant edit popup — opened from the rent table so the owner can
+   fix name / rent / contact without leaving rent collection.
+   ═══════════════════════════════════════════════════════════════════ */
+function QuickTenantModal({
+  tenancy, flats, onClose, onDone,
+}: {
+  tenancy: Tenancy;
+  flats: Flat[];
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const [form, setForm] = useState({
+    tenantName: tenancy.tenantName ?? "",
+    tenantEmail: tenancy.tenantEmail ?? "",
+    tenantPhone: tenancy.tenantPhone ?? "",
+    rentAmount: tenancy.rentAmount != null ? String(tenancy.rentAmount) : "",
+    maintenanceAmount: tenancy.maintenanceAmount != null ? String(tenancy.maintenanceAmount) : "",
+    frequency: tenancy.frequency ?? "MONTHLY",
+    dueDay: tenancy.dueDay != null ? String(tenancy.dueDay) : "5",
+  });
+  const [busy, setBusy] = useState(false);
+  const flat = flats.find((f) => f.id === tenancy.flatId);
+
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) { if (e.key === "Escape") onClose(); }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  async function submit() {
+    if (!form.tenantName.trim()) { toast.error("Name is required"); return; }
+    setBusy(true);
+    try {
+      await api.put(`/api/owner/tenants/${tenancy.id}`, {
+        tenantName: form.tenantName.trim(),
+        tenantEmail: form.tenantEmail.trim() || null,
+        tenantPhone: form.tenantPhone.trim() || null,
+        rentAmount: form.rentAmount ? Number(form.rentAmount) : null,
+        maintenanceAmount: form.maintenanceAmount ? Number(form.maintenanceAmount) : null,
+        frequency: form.frequency,
+        dueDay: form.dueDay ? Number(form.dueDay) : 5,
+        active: tenancy.active,
+      });
+      toast.success("Tenant updated");
+      onDone();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message ?? "Failed to save tenant");
+    } finally { setBusy(false); }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 md:p-6"
+      onClick={onClose} role="dialog" aria-modal="true">
+      <div className="bg-card rounded-2xl border border-border max-w-lg w-full max-h-[92vh] flex flex-col overflow-hidden"
+        onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between p-4 md:p-5 border-b border-border/60 shrink-0">
+          <div>
+            <h2 className="text-base md:text-lg font-semibold">Edit tenant</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {flat ? `Flat ${flat.flatNo}` : `Flat #${tenancy.flatId}`} · edit without leaving rent
+            </p>
+          </div>
+          <button onClick={onClose} className="rounded-lg p-1.5 hover:bg-accent" aria-label="Close">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="p-4 md:p-5 grid gap-3 grid-cols-1 md:grid-cols-2 overflow-y-auto">
+          <div className="md:col-span-2">
+            <Label>Full name *</Label>
+            <Input value={form.tenantName}
+              onChange={(e) => setForm({ ...form, tenantName: e.target.value })} autoFocus />
+          </div>
+          <div>
+            <Label>Email</Label>
+            <Input type="email" value={form.tenantEmail}
+              onChange={(e) => setForm({ ...form, tenantEmail: e.target.value })} />
+          </div>
+          <div>
+            <Label>Phone</Label>
+            <Input value={form.tenantPhone}
+              onChange={(e) => setForm({ ...form, tenantPhone: e.target.value })} />
+          </div>
+          <div>
+            <Label>Monthly rent (₹)</Label>
+            <Input type="number" value={form.rentAmount}
+              onChange={(e) => setForm({ ...form, rentAmount: e.target.value })} />
+          </div>
+          <div>
+            <Label>Maintenance (₹)</Label>
+            <Input type="number" value={form.maintenanceAmount}
+              onChange={(e) => setForm({ ...form, maintenanceAmount: e.target.value })} />
+          </div>
+          <div>
+            <Label>Frequency</Label>
+            <select className="w-full h-10 rounded-lg border bg-background px-3 text-sm"
+              value={form.frequency}
+              onChange={(e) => setForm({ ...form, frequency: e.target.value })}>
+              {["MONTHLY", "WEEKLY", "DAILY", "QUARTERLY", "YEARLY"].map((f) => (
+                <option key={f} value={f}>{f.charAt(0) + f.slice(1).toLowerCase()}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <Label>Due day</Label>
+            <Input type="number" min={1} max={31} value={form.dueDay}
+              onChange={(e) => setForm({ ...form, dueDay: e.target.value })} />
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end gap-2 p-4 md:p-5 border-t border-border/60 shrink-0">
+          <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
+          <Button variant="gradient" onClick={submit} disabled={busy || !form.tenantName.trim()}>
+            {busy && <Loader2 className="h-4 w-4 animate-spin" />} Save changes
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 }
 

@@ -17,6 +17,7 @@ import { Pagination, type PageSize } from "@/components/ui/pagination";
 import { api } from "@/lib/api";
 import { DeleteButton } from "@/components/ui/delete-button";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { InlineLink } from "@/components/ui/inline-link";
 import { fmtINR } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -247,8 +248,17 @@ export default function TenantsPage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-medium truncate">
-                          {f.floor != null ? `Floor ${f.floor}` : "Flat"}
-                          {f.bedrooms ? ` · ${f.bedrooms} BHK` : ""}
+                          <InlineLink
+                            onClick={() => { setShowFlats(true); setFlatModal({ mode: "edit", flat: f }); }}
+                            title="Edit this flat"
+                          >
+                            {f.flatNo}
+                          </InlineLink>
+                          {" "}
+                          <span className="font-normal text-muted-foreground">
+                            {f.floor != null ? `Floor ${f.floor}` : "Flat"}
+                            {f.bedrooms ? ` · ${f.bedrooms} BHK` : ""}
+                          </span>
                         </div>
                         <div className="text-xs text-muted-foreground truncate">
                           {f.meterSerialNo ? `Meter ${f.meterSerialNo}` : "No meter"}
@@ -362,15 +372,27 @@ export default function TenantsPage() {
                     key={t.id}
                     className={t.active ? "" : "opacity-60"}
                   >
-                    <TableCell className="font-medium">{t.tenantName}</TableCell>
+                    <TableCell className="font-medium">
+                      <InlineLink
+                        onClick={() => setTenantModal({ mode: "edit", tenant: t })}
+                        title="Edit this tenant"
+                      >
+                        {t.tenantName}
+                      </InlineLink>
+                    </TableCell>
                     <TableCell>
                       {flat ? (
-                        <span className="inline-flex items-center gap-1">
+                        <InlineLink
+                          onClick={() => { setShowFlats(true); setFlatModal({ mode: "edit", flat }); }}
+                          title="Edit this flat"
+                        >
                           <Home className="h-3 w-3 text-muted-foreground" />
                           {flat.flatNo}
-                        </span>
+                        </InlineLink>
                       ) : (
-                        `#${t.flatId}`
+                        <InlineLink muted title="Flat not found">
+                          #{t.flatId}
+                        </InlineLink>
                       )}
                     </TableCell>
                     <TableCell className="text-muted-foreground">

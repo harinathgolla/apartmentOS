@@ -15,6 +15,8 @@ import { MeterReadingModal, type Flat, type MeterRow } from "@/components/utilit
 import { UtilityBillModal, type UtilityBill } from "@/components/utilities/utility-bill-modal";
 import { CommonMeterModal } from "@/components/utilities/common-meter-modal";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { InlineLink } from "@/components/ui/inline-link";
+import { QuickFlatModal, type QuickFlat } from "@/components/owner/quick-flat-modal";
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 type Tab = "overview" | "electricity" | "water" | "bills";
@@ -36,6 +38,12 @@ export default function UtilitiesPage() {
   const [commonModal, setCommonModal] = useState(false);
   const [waterRows, setWaterRows] = useState<any[]>([]);
   const [waterModal, setWaterModal] = useState<{ existing: MeterRow | null } | null>(null);
+  const [flatEdit, setFlatEdit] = useState<QuickFlat | null>(null);
+
+  async function reloadFlats() {
+    const r = await api.get<Flat[]>("/api/owner/flats").catch(() => null);
+    if (r) setFlats(Array.isArray(r.data) ? r.data : []);
+  }
 
   const load = useCallback(() => {
     setLoading(true);
@@ -174,7 +182,7 @@ export default function UtilitiesPage() {
             <TableBody>
               {rows.length === 0 && <TableRow><TableCell colSpan={8} className="py-10 text-center text-muted-foreground">{loading ? "Loading readings…" : error ? "Readings unavailable" : "No electricity readings recorded for this period."}</TableCell></TableRow>}
               {rows.map((r) => <TableRow key={r.id}>
-                <TableCell className="font-medium">{r.flatNo ?? `#${r.flatId}`}</TableCell>
+                <TableCell className="font-medium"><FlatCell flatId={r.flatId} flatNo={r.flatNo} flats={flats} onEdit={setFlatEdit} /></TableCell>
                 <TableCell>{r.previousReading ?? "—"}</TableCell>
                 <TableCell>{r.presentReading ?? "—"}</TableCell>
                 <TableCell>{r.usageUnits ?? "—"}</TableCell>
@@ -285,7 +293,7 @@ export default function UtilitiesPage() {
                   <TableBody>
                     {waterRows.length === 0 && <TableRow><TableCell colSpan={8} className="py-10 text-center text-muted-foreground">No water readings recorded for this period.</TableCell></TableRow>}
                     {waterRows.map((r) => <TableRow key={r.id}>
-                      <TableCell className="font-medium">{r.flatNo ?? `#${r.flatId}`}</TableCell>
+                      <TableCell className="font-medium"><FlatCell flatId={r.flatId} flatNo={r.flatNo} flats={flats} onEdit={setFlatEdit} /></TableCell>
                       <TableCell>{r.previousReading ?? "—"}</TableCell>
                       <TableCell>{r.presentReading ?? "—"}</TableCell>
                       <TableCell>{r.usageUnits ?? "—"}</TableCell>
@@ -394,6 +402,34 @@ export default function UtilitiesPage() {
           onDone={() => { setWaterModal(null); loadWater(); }}
         />
       )}
+
+      {flatEdit && (
+        <QuickFlatModal
+          flat={flatEdit}
+          onClose={() => setFlatEdit(null)}
+          onDone={() => { setFlatEdit(null); reloadFlats(); load(); loadWater(); }}
+        />
+      )}
     </>
+  );
+}
+
+/** Flat cell rendered as a hyperlink — click opens the inline flat editor. */
+function FlatCell({
+  flatId, flatNo, flats, onEdit,
+}: {
+  flatId: number;
+  flatNo?: string | null;
+  flats: Flat[];
+  onEdit: (f: QuickFlat) => void;
+}) {
+  const fl = flats.find((f) => f.id === flatId);
+  if (!fl) {
+    return <InlineLink muted title="Flat not found">#{flatId}</InlineLink>;
+  }
+  return (
+    <InlineLink onClick={() => onEdit(fl as QuickFlat)} title="Edit this flat">
+      {flatNo ?? fl.flatNo}
+    </InlineLink>
   );
 }

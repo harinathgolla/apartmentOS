@@ -11,6 +11,8 @@ import { api } from "@/lib/api";
 import { fmtINR } from "@/lib/utils";
 import { toast } from "sonner";
 import { MeterReadingModal, type Flat, type MeterRow } from "@/components/utilities/meter-reading-modal";
+import { InlineLink } from "@/components/ui/inline-link";
+import { QuickFlatModal } from "@/components/owner/quick-flat-modal";
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 
@@ -22,6 +24,14 @@ export default function ElectricityPage() {
   const [loading, setLoading] = useState(false);
   const [modal, setModal] = useState<{ existing: MeterRow | null } | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
+  // Inline flat edit popup — lets the owner fix the flat without leaving this page.
+  const [flatEdit, setFlatEdit] = useState<Flat | null>(null);
+  const [flatEditNew, setFlatEditNew] = useState(false);
+
+  async function reloadFlats() {
+    const r = await api.get<Flat[]>("/api/owner/flats").catch(() => null);
+    if (r) setFlats(Array.isArray(r.data) ? r.data : []);
+  }
 
   const load = useCallback(() => {
     setLoading(true);
@@ -99,7 +109,23 @@ export default function ElectricityPage() {
                 )}
                 {rows.map((r) => (
                   <TableRow key={r.id}>
-                    <TableCell className="font-medium">{r.flatNo ?? `#${r.flatId}`}</TableCell>
+                    <TableCell className="font-medium">
+                      {(() => {
+                        const fl = flats.find((f) => f.id === r.flatId);
+                        return fl ? (
+                          <InlineLink
+                            onClick={() => setFlatEdit(fl)}
+                            title="Edit this flat"
+                          >
+                            {fl.flatNo}
+                          </InlineLink>
+                        ) : (
+                          <InlineLink muted title="Flat not found">
+                            #{r.flatId}
+                          </InlineLink>
+                        );
+                      })()}
+                    </TableCell>
                     <TableCell>{r.previousReading ?? "—"}</TableCell>
                     <TableCell>{r.presentReading ?? "—"}</TableCell>
                     <TableCell>{r.usageUnits ?? "—"}</TableCell>
@@ -138,6 +164,14 @@ export default function ElectricityPage() {
           existing={modal.existing}
           onClose={() => setModal(null)}
           onDone={() => { setModal(null); load(); }}
+        />
+      )}
+
+      {(flatEdit || flatEditNew) && (
+        <QuickFlatModal
+          flat={flatEdit}
+          onClose={() => { setFlatEdit(null); setFlatEditNew(false); }}
+          onDone={() => { setFlatEdit(null); setFlatEditNew(false); reloadFlats(); }}
         />
       )}
     </>
