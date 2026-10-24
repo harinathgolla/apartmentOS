@@ -1,0 +1,105 @@
+name: Deploy to EC2 (apartmentos)
+
+# Runs after the build+push workflow succeeds on main.
+# Authenticates to AWS via GitHub OIDC (no static keys) and drives SSM SendCommand
+# against the single EC2 instance. The instance pulls the immutable sha tag.
+
+on:
+  workflow_run:
+    workflows: ["Build and push images to GHCR"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Image tag to deploy (git sha or 'latest')"
+        required: false
+        default: "latest"
+
+concurrency:
+  group: deploy-apartmentos
+  cancel-in-progress: false
+
+permissions:
+  id-token: write      # required for OIDC
+  contents: read
+
+env:
+  AWS_REGION: ap-south-2
+  ROLE_ARN: arn:aws:iam::962634335384:role/apartmentos-github-deploy
+  INSTANCE_ID: i-0e88fcb85356bc5f2
+
+jobs:
+  deploy:
+    # Only deploy when the upstream build actually succeeded (or on manual dispatch).
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve image tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ github.event.inputs.image_tag }}"
+          else
+            TAG="${{ github.event.workflow_run.head_sha }}"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Deploying tag: $TAG"
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.ROLE_ARN }}
+          role-session-name: gha-deploy-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Send deploy command via SSM
+        id: send
+        run: |
+          CMD_ID=$(aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name AWS-RunShellScript \
+            --comment "deploy ${{ steps.tag.outputs.tag }}" \
+            --timeout-seconds 600 \
+            --parameters commands="cd /opt/apartmentos && bash start.sh ${{ steps.tag.outputs.tag }}" \
+            --query 'Command.CommandId' --output text)
+          echo "command_id=$CMD_ID" >> "$GITHUB_OUTPUT"
+          echo "SSM CommandId: $CMD_ID"
+
+      - name: Wait for deploy command to finish
+        id: wait
+        run: |
+          CMD_ID="${{ steps.send.outputs.command_id }}"
+          for i in $(seq 1 100); do
+            STATUS=$(aws ssm get-command-invocation \
+              --command-id "$CMD_ID" \
+              --instance-id "$INSTANCE_ID" \
+              --query 'Status' --output text 2>/dev/null || echo Pending)
+            echo "poll $i: $STATUS"
+            case "$STATUS" in
+              Success|Failed|Cancelled|TimedOut) break ;;
+            esac
+            sleep 6
+          done
+          echo "status=$STATUS" >> "$GITHUB_OUTPUT"
+
+          echo '===== STDOUT ====='
+          aws ssm get-command-invocation --command-id "$CMD_ID" --instance-id "$INSTANCE_ID" \
+            --query 'StandardOutputContent' --output text | tail -100
+          echo '===== STDERR ====='
+          aws ssm get-command-invocation --command-id "$CMD_ID" --instance-id "$INSTANCE_ID" \
+            --query 'StandardErrorContent' --output text | tail -60
+
+          if [ "$STATUS" != "Success" ]; then
+            echo "Deploy failed with status $STATUS" >&2
+            exit 1
+          fi
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "### Deploy" >> $GITHUB_STEP_SUMMARY
+          echo "- image tag: \`${{ steps.tag.outputs.tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- instance: \`${{ env.INSTANCE_ID }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- ssm command: \`${{ steps.send.outputs.command_id }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- status: \`${{ steps.wait.outputs.status }}\`" >> $GITHUB_STEP_SUMMARY
