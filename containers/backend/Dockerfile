@@ -33,8 +33,6 @@ HEALTHCHECK --interval=15s --timeout=3s --start-period=40s --retries=5 \
   CMD curl -fsS http://localhost:8080/actuator/health || exit 1
 
 ENTRYPOINT ["java", \
-  "-XX:+UseZGC", \
-  "-XX:+ZGenerational", \
-  "-Xms256m", "-Xmx768m", \
+  "-Xms128m", "-Xmx384m", \
   "-Djava.security.egd=file:/dev/./urandom", \
   "-jar", "app.jar"]
