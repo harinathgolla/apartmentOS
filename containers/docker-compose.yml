@@ -28,27 +28,6 @@ services:
       - apartment-net
 
   # ═══════════════════════════════════════════════════════
-  # Redis — cache, sessions, rate limits
-  # ═══════════════════════════════════════════════════════
-  redis:
-    image: redis:7-alpine
-    container_name: apt-redis
-    restart: unless-stopped
-    command: ["redis-server", "/usr/local/etc/redis/redis.conf", "--requirepass", "${REDIS_PASSWORD}"]
-    ports:
-      - "${REDIS_PORT}:6379"
-    volumes:
-      - redis_data:/data
-      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
-    healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-    networks:
-      - apartment-net
-
-  # ═══════════════════════════════════════════════════════
   # MailHog — catch all outgoing email in dev
   # Visit http://localhost:8025 to see messages
   # ═══════════════════════════════════════════════════════
@@ -119,9 +98,6 @@ services:
       SPRING_DATASOURCE_URL: jdbc:mysql://apt-mysql:3306/${MYSQL_DATABASE}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
       SPRING_DATASOURCE_USERNAME: ${MYSQL_USER}
       SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD}
-      SPRING_DATA_REDIS_HOST: apt-redis
-      SPRING_DATA_REDIS_PORT: 6379
-      SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD}
       SPRING_MAIL_HOST: apt-mailhog
       SPRING_MAIL_PORT: 1025
       # OAuth wiring is driven by application-mock-oauth.yml: Spring discovers
@@ -140,8 +116,6 @@ services:
       - "${BACKEND_PORT}:8080"
     depends_on:
       mysql:
-        condition: service_healthy
-      redis:
         condition: service_healthy
     networks:
       - apartment-net
@@ -194,7 +168,7 @@ services:
 
 volumes:
   mysql_data:
-  redis_data:
+  # redis_data removed with the Redis service
 
 networks:
   apartment-net:

@@ -2,9 +2,6 @@ services:
   mysql:
     ports:
       - "${MYSQL_PORT}:3306"
-  redis:
-    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}", "--save", ""]
-
   # Expose mailhog by default in dev
   mailhog:
     profiles: [dev,full]   # always on in dev
