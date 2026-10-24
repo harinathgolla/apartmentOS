@@ -17,6 +17,8 @@ import {
 import { api } from "@/lib/api";
 import { fmtINR } from "@/lib/utils";
 import { toast } from "sonner";
+import { InlineLink } from "@/components/ui/inline-link";
+import { QuickFlatModal, type QuickFlat } from "@/components/owner/quick-flat-modal";
 
 type Apartment = { id: number; name: string; city?: string };
 type Row = {
@@ -42,6 +44,7 @@ export default function LiabilitiesPage() {
   const [data, setData] = useState<Overview | null>(null);
   const [loading, setLoading] = useState(false);
   const [settleFor, setSettleFor] = useState<Row | null>(null);
+  const [flatEdit, setFlatEdit] = useState<QuickFlat | null>(null);
 
   useEffect(() => {
     api.get<Apartment[]>("/api/owner/apartments")
@@ -134,10 +137,17 @@ export default function LiabilitiesPage() {
                   <TableCell className="font-medium">{r.tenantName}</TableCell>
                   <TableCell>
                     {r.flatNo ? (
-                      <span className="inline-flex items-center gap-1">
+                      <InlineLink
+                        onClick={() => setFlatEdit({
+                          id: r.flatId, flatNo: r.flatNo!, apartmentId: selectedAptId!,
+                        })}
+                        title="Edit this flat"
+                      >
                         <Home className="h-3 w-3 text-muted-foreground" />{r.flatNo}
-                      </span>
-                    ) : `#${r.flatId}`}
+                      </InlineLink>
+                    ) : (
+                      <InlineLink muted title="Flat not found">#{r.flatId}</InlineLink>
+                    )}
                   </TableCell>
                   <TableCell>
                     <Badge variant={r.tenancyType === "LEASE" ? "info" : "secondary"}>
@@ -178,6 +188,14 @@ export default function LiabilitiesPage() {
           apartmentId={selectedAptId}
           onClose={() => setSettleFor(null)}
           onDone={() => { setSettleFor(null); load(); }}
+        />
+      )}
+
+      {flatEdit && (
+        <QuickFlatModal
+          flat={flatEdit}
+          onClose={() => setFlatEdit(null)}
+          onDone={() => { setFlatEdit(null); load(); }}
         />
       )}
     </>

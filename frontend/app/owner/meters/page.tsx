@@ -15,6 +15,8 @@ import {
 import { api } from "@/lib/api";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { toast } from "sonner";
+import { InlineLink } from "@/components/ui/inline-link";
+import { QuickFlatModal, type QuickFlat } from "@/components/owner/quick-flat-modal";
 
 type Apartment = { id: number; name: string; city?: string };
 type Flat = { id: number; flatNo: string; apartmentId: number; floor?: number };
@@ -34,6 +36,7 @@ export default function MetersPage() {
   const [meters, setMeters] = useState<Meter[]>([]);
   const [loading, setLoading] = useState(false);
   const [modal, setModal] = useState<{ mode: "create" } | { mode: "edit"; meter: Meter } | null>(null);
+  const [flatEdit, setFlatEdit] = useState<QuickFlat | null>(null);
 
   useEffect(() => {
     api.get<Apartment[]>("/api/owner/apartments")
@@ -148,7 +151,20 @@ export default function MetersPage() {
               {meters.map((m) => (
                 <TableRow key={m.id}>
                   <TableCell className="font-medium">
-                    {m.flatId ? (flatsById.get(m.flatId)?.flatNo ?? `#${m.flatId}`) : "—"}
+                    {(() => {
+                      if (!m.flatId) return "—";
+                      const fl = flatsById.get(m.flatId);
+                      return fl ? (
+                        <InlineLink
+                          onClick={() => setFlatEdit({ id: fl.id, flatNo: fl.flatNo, apartmentId: fl.apartmentId, floor: fl.floor })}
+                          title="Edit this flat"
+                        >
+                          {fl.flatNo}
+                        </InlineLink>
+                      ) : (
+                        <InlineLink muted title="Flat not found">#{m.flatId}</InlineLink>
+                      );
+                    })()}
                   </TableCell>
                   <TableCell>
                     <span className="inline-flex items-center gap-1">
@@ -192,6 +208,14 @@ export default function MetersPage() {
           </Table>
         </CardContent>
       </Card>
+
+      {flatEdit && (
+        <QuickFlatModal
+          flat={flatEdit}
+          onClose={() => setFlatEdit(null)}
+          onDone={() => { setFlatEdit(null); load(); }}
+        />
+      )}
 
       {modal && selectedAptId && (
         <MeterFormModal

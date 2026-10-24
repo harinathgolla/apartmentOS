@@ -14,6 +14,8 @@ import { Pagination } from "@/components/ui/pagination";
 import { api } from "@/lib/api";
 import { fmtINR } from "@/lib/utils";
 import { toast } from "sonner";
+import { InlineLink } from "@/components/ui/inline-link";
+import { QuickFlatModal, type QuickFlat } from "@/components/owner/quick-flat-modal";
 
 type Apartment = { id: number; name: string; city?: string };
 type Flat = { id: number; flatNo: string; apartmentId: number };
@@ -38,6 +40,7 @@ export default function PastTenantsPage() {
   const [size, setSize] = useState<any>(25);
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
+  const [flatEdit, setFlatEdit] = useState<QuickFlat | null>(null);
 
   useEffect(() => {
     api.get<Apartment[]>("/api/owner/apartments")
@@ -164,10 +167,20 @@ export default function PastTenantsPage() {
                       )}
                     </TableCell>
                     <TableCell>
-                      <span className="inline-flex items-center gap-1">
-                        <Home className="h-3 w-3 text-muted-foreground" />
-                        {flatsById.get(r.flatId)?.flatNo ?? `#${r.flatId}`}
-                      </span>
+                      {(() => {
+                        const fl = flatsById.get(r.flatId);
+                        return fl ? (
+                          <InlineLink
+                            onClick={() => setFlatEdit({ id: fl.id, flatNo: fl.flatNo, apartmentId: fl.apartmentId })}
+                            title="Edit this flat"
+                          >
+                            <Home className="h-3 w-3 text-muted-foreground" />
+                            {fl.flatNo}
+                          </InlineLink>
+                        ) : (
+                          <InlineLink muted title="Flat not found">#{r.flatId}</InlineLink>
+                        );
+                      })()}
                     </TableCell>
                     <TableCell>
                       <Badge variant={r.tenancyType === "LEASE" ? "info" : "secondary"}>
@@ -220,6 +233,14 @@ export default function PastTenantsPage() {
           />
         </CardContent>
       </Card>
+
+      {flatEdit && (
+        <QuickFlatModal
+          flat={flatEdit}
+          onClose={() => setFlatEdit(null)}
+          onDone={() => { setFlatEdit(null); load(); }}
+        />
+      )}
     </>
   );
 }
