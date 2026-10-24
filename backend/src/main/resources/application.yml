@@ -57,6 +57,11 @@ app:
     url: ${FRONTEND_URL:http://localhost:3000}
   gmail:
     from-name: "Apartment Manager"
+  mail:
+    # gmail-api  = send through the Gmail API using the owner's stored refresh token (real email)
+    # smtp       = send through spring.mail.* (MailHog in dev, or a real SMTP relay)
+    # Overridden to smtp by the docker and mock-oauth profiles.
+    provider: ${APP_MAIL_PROVIDER:gmail-api}
   razorpay:
     key-id: ${RAZORPAY_KEY_ID:rzp_test_xxx}
     key-secret: ${RAZORPAY_KEY_SECRET:xxx}
