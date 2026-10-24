@@ -12,7 +12,8 @@ public class CorsConfig {
         // "http://localhost:*" requires an explicit port, so it does NOT match the
         // bare origin http://localhost (port 80, as served through nginx). List it
         // explicitly so both the dev (:3000) and prod (:80) origins are allowed.
-        c.setAllowedOriginPatterns(List.of(front, "http://localhost", "http://localhost:*"));
+        c.setAllowedOriginPatterns(List.of(front, "http://localhost", "http://localhost:*",
+                "http://18.60.42.236", "http://18.60.42.236:*"));
         c.setAllowedMethods(List.of("GET","POST","PUT","DELETE","PATCH","OPTIONS"));
         c.setAllowedHeaders(List.of("*"));
         c.setAllowCredentials(true);
