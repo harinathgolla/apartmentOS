@@ -39,7 +39,7 @@ cd containers
 # open https://localhost  (accept the self-signed warning, or import ca.crt)
 
 # optional: pre-generate certs on the host to import ca.crt first
-./scripts/gen-certs.sh
+docker cp apt-nginx:/etc/nginx/certs/ca.crt .
 ```
 
 ## Google Cloud Console
