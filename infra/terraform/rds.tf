@@ -48,7 +48,7 @@ resource "random_password" "db" {
 }
 
 resource "aws_db_instance" "main" {
-  identifier = "${local.name_prefix}-mysql"
+  identifier = var.db_identifier != "" ? var.db_identifier : "${local.name_prefix}-mysql"
 
   engine         = "mysql"
   engine_version = var.db_engine_version

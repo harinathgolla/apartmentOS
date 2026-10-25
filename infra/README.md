@@ -56,17 +56,47 @@ Then copy the outputs into the GitHub workflow env if anything changed:
 | `instance_id` | `deploy.yml` → `INSTANCE_ID` |
 | `public_ip` / `app_url` | DNS, `APP_FRONTEND_URL` |
 
-## Adopting the already-running instance
+## Status of the live account (read this first)
 
-The current host (`i-0e88fcb85356bc5f2`) was created before this code existed.
-Import it instead of recreating:
+This stack was written **after** the dev environment already existed, and the
+live resources were created by hand. It is therefore a **reference / greenfield
+provisioning implementation, not the manager of the live account.**
+
+Running `terraform apply` against the live account would create a *second*
+VPC / RDS / IAM / bucket set alongside the real ones. Do not do it.
+
+A trial import of `aws_instance.app` was performed and then rolled back
+(`terraform state rm aws_instance.app`); state is now empty. Nothing in AWS was
+created, changed, or destroyed.
+
+### If you ever want Terraform to own the live account
+
+You must import every existing resource first, otherwise the plan shows them as
+`to add`. Import the instance with:
 
 ```bash
 terraform import aws_instance.app i-0e88fcb85356bc5f2
 ```
 
-The `aws_instance.app` resource ignores `ami` and `user_data` drift so an
-import does not trigger a replacement of the live host.
+and import the VPC, subnets, route tables, security groups, RDS instance and
+parameter/subnet groups, S3 buckets and their sub-resources, IAM roles,
+policies and instance profile, and the SSM parameter. Then get the plan to
+zero changes before trusting it.
+
+### Live resources this code describes
+
+| what | live value |
+| --- | --- |
+| EC2 instance | `i-0e88fcb85356bc5f2`, `t4g.small`, AZ `ap-south-2a`, AMI `ami-095ef26692f084edc` |
+| RDS | identifier `apartmentos-mysql`, MySQL `8.4.11`, `db.t4g.micro` |
+| S3 | `apartmentos-backups-962634335384`, `apartmentos-deploy-962634335384` |
+| IAM | `apartmentos-ec2-instance-role`, `apartmentos-ec2-instance-profile`, `apartmentos-github-deploy`, `apartmentos-deploy-policy` |
+| SSM | `/apartmentos/dev/db/password` (JWT secret not created yet) |
+| Elastic IP | **none** — the instance uses its auto-assigned public IP |
+
+Note the live account has **no Elastic IP**. `ec2.tf` declares one, so a
+fresh greenfield deploy would get a stable IP the current hand-made host does
+not have.
 
 ## Secrets
 

@@ -98,11 +98,12 @@ variable "ec2_root_volume_type" {
 
 variable "ec2_ami_id" {
   description = <<-EOT
-    Explicit AMI id for the app host. Leave empty to auto-select the latest
-    Amazon Linux 2023 ARM64 AMI. Pin this if you need reproducible rebuilds.
+    Explicit AMI id for the app host. Defaults to the AMI the live instance
+    (i-0e88fcb85356bc5f2) was actually launched from, so the code describes
+    reality. Set to "" to auto-select the latest Amazon Linux 2023 ARM64 AMI.
   EOT
   type        = string
-  default     = ""
+  default     = "ami-095ef26692f084edc"
 }
 
 variable "key_pair_name" {
@@ -124,6 +125,17 @@ variable "ssh_ingress_cidrs" {
 # ---------------------------------------------------------------------------
 # RDS
 # ---------------------------------------------------------------------------
+
+variable "db_identifier" {
+  description = <<-EOT
+    RDS instance identifier. Defaults to the live instance name
+    (apartmentos-mysql) rather than the name_prefix-derived name, so the code
+    matches the account. For a brand-new environment leave empty to use
+    "<project>-<environment>-mysql".
+  EOT
+  type        = string
+  default     = "apartmentos-mysql"
+}
 
 variable "db_instance_class" {
   description = "RDS instance class. db.t4g.micro is free for 12 months (single-AZ, <=20 GB)."
