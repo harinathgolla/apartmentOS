@@ -1,0 +1,59 @@
+#!/bin/bash
+# ApartmentOS EC2 bootstrap (Amazon Linux 2023, ARM64).
+# Installs Docker + Compose and lays down the deploy scripts that the GitHub
+# Actions -> SSM deploy path expects at /opt/apartmentos.
+set -euxo pipefail
+
+APP_DIR="${app_dir}"
+
+# ── Docker engine + compose plugin ───────────────────────────────────────────
+dnf -y update
+dnf -y install docker git curl jq
+systemctl enable --now docker
+usermod -aG docker ec2-user || true
+
+mkdir -p /usr/local/lib/docker/cli-plugins
+curl -fsSL https://github.com/docker/compose/releases/latest/download/docker-compose-linux-aarch64 \
+  -o /usr/local/lib/docker/cli-plugins/docker-compose
+chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+
+# ── App directory + deploy scripts (from infra/deploy/) ──────────────────────
+mkdir -p "$APP_DIR"
+cat > "$APP_DIR/start.sh" <<'APARTMENTOS_START_SH'
+${start_sh}
+APARTMENTOS_START_SH
+chmod +x "$APP_DIR/start.sh"
+
+cat > "$APP_DIR/docker-compose.yml" <<'APARTMENTOS_COMPOSE'
+${compose_yml}
+APARTMENTOS_COMPOSE
+
+cat > "$APP_DIR/nginx.conf" <<'APARTMENTOS_NGINX'
+${nginx_conf}
+APARTMENTOS_NGINX
+
+chown -R root:root "$APP_DIR"
+chmod 755 "$APP_DIR"
+
+# ── Seed .env from SSM so the very first boot can start without CI ───────────
+DB_PASSWORD=$(aws ssm get-parameter --name "${ssm_prefix}/db/password" --with-decryption \
+  --region "${aws_region}" --query Parameter.Value --output text 2>/dev/null || echo "")
+JWT_SECRET=$(aws ssm get-parameter --name "${ssm_prefix}/jwt/secret" --with-decryption \
+  --region "${aws_region}" --query Parameter.Value --output text 2>/dev/null || echo "change-me-32-byte-dev-secret-xxxxxxxx")
+
+cat > "$APP_DIR/.env" <<EOF
+SPRING_PROFILES_ACTIVE=docker
+SPRING_DATASOURCE_URL=jdbc:mysql://${db_endpoint}:3306/${db_name}?useSSL=true&requireSSL=true&serverTimezone=UTC
+SPRING_DATASOURCE_USERNAME=${db_username}
+SPRING_DATASOURCE_PASSWORD=$DB_PASSWORD
+SPRING_MAIL_HOST=smtp.gmail.com
+SPRING_MAIL_PORT=587
+APP_MAIL_PROVIDER=gmail-api
+APP_FRONTEND_URL=${frontend_url}
+JWT_SECRET=$JWT_SECRET
+EOF
+chmod 600 "$APP_DIR/.env"
+
+# ── First boot (CI will re-run start.sh with an immutable sha tag) ──────────
+cd "$APP_DIR"
+bash ./start.sh "${image_tag}" || echo 'WARN: first-boot start.sh failed; CI deploy will retry'

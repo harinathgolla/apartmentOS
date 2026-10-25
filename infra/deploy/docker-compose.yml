@@ -1,0 +1,40 @@
+services:
+  backend:
+    image: ghcr.io/harinathgolla/apartmentos-backend:${IMAGE_TAG:-latest}
+    container_name: apartmentos-backend
+    restart: unless-stopped
+    pull_policy: always
+    env_file:
+      - .env
+    mem_limit: 900m
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health"]
+      interval: 20s
+      timeout: 5s
+      start_period: 120s
+      retries: 10
+
+  frontend:
+    image: ghcr.io/harinathgolla/apartmentos-frontend:${IMAGE_TAG:-latest}
+    container_name: apartmentos-frontend
+    restart: unless-stopped
+    pull_policy: always
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HOSTNAME: 0.0.0.0
+    mem_limit: 400m
+    depends_on:
+      - backend
+
+  nginx:
+    image: nginx:alpine
+    container_name: apartmentos-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - backend
+      - frontend

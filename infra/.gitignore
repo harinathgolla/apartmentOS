@@ -1,0 +1,24 @@
+# Terraform state and plans - never commit
+tfstate
+*.tfstate.*
+*.tfplan
+tfplan
+crash.log
+crash.*.log
+.terraform/
+
+# Local override files
+*.auto.tfvars
+terraform.tfvars
+*.tfvars.json
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Transient helper files used while inspecting the live instance
+_ssm_params.json
+_raw_ssm.txt
+
+# Generated on the host, never committed
+deploy/.env
