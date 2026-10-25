@@ -34,10 +34,14 @@ public class OAuthTokenPersistence implements AuthenticationSuccessHandler {
             String refresh = client.getRefreshToken() != null
                     ? client.getRefreshToken().getTokenValue() : null;
             users.findByEmail(email).ifPresent(u -> {
-                if (refresh != null) u.setGoogleRefreshToken(refresh);
-                u.setGoogleConnected(true);
-                users.save(u);
-                log.info("Stored Google refresh token for {}", email);
+                if (refresh != null) {
+                    u.setGoogleRefreshToken(refresh);
+                    u.setGoogleConnected(true);
+                    users.save(u);
+                    log.info("Stored Google refresh token for {}", email);
+                } else {
+                    log.warn("No refresh token returned for {} — offline consent not granted", email);
+                }
             });
         } catch (Exception e) {
             log.error("OAuth success handler failed", e);

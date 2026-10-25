@@ -23,6 +23,14 @@ spring:
               - openid
               - email
               - profile
+              - https://www.googleapis.com/auth/gmail.send
+        provider:
+          google:
+            authorization-uri: https://accounts.google.com/o/oauth2/v2/auth?access_type=offline&prompt=consent
+            token-uri: https://oauth2.googleapis.com/token
+            user-info-uri: https://openidconnect.googleapis.com/v1/userinfo
+            user-name-attribute: sub
+
 app:
   jwt:
     secret: ${JWT_SECRET:please-change-me}
